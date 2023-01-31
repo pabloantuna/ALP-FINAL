@@ -28,21 +28,65 @@ import Data.Char
     '++'           { TConcat }                -- para la concatenacion de dos gramaticas (simplemente es este simbolo por la concatenacion de listas en haskell)
     '~'            { TComplement }            -- para el complemento de una gramatica (casi seguro que ~ es literalmente el simbolo de complemento de conjunto en algun lado)
     '~~'           { TReverse }               -- para hacer el reverso de una gramatica (aca de nuevo me quede sin ideas de simbolos)
-    '!'            { TSide }                  -- para pasar de derecha (izquierda) a izquierda (derecha) (si estas leyendo todos los comentarios te daras una idea de que aca nuevamente me quede sin ideas de simbolos je)
+    '!'            { TSide }                  -- para pasar de derecha (izquierda) a izquierda (derecha) (aca nuevamente me quede sin ideas de simbolos je)
     T              { TT $$}                   -- los simbolos terminales
     NT             { TNT $$}                  -- los simbolos no terminales
+    '('            { TOpen }                  -- abrir parentesis para tener cosas como g1 + (g2 - g3)
+    ')'            { TClose }                 -- cerrar parentesis para lo mismo obviamente je
 
 
 %%
+----------------------------------------------------
+--- Toda la parte de la definicion de la gramatica
+--- onda sus reglas de produccion y eso
+--- lo que se cargaria de un archivo .grm
+----------------------------------------------------
+ 
+-- lado izquierdo de una regla de produccion puede tener el simbolo inicial el cual distinguimos del resto por obvias razones, o un simbolo No Terminal (NT)
+LeftSide : '&'                                 { GrmInitial }
+         | NT                                  { GrmNT $1 }
 
+-- lado derecho de una regla de produccion para una gramatica izquierda
+RightSideGIzq : 
+              |
+
+-- lado derecho de una regla de produccion para una gramatica derecha
+RightSideGDer :
+              |
+
+-- la regla en si para una gramatica izquierda
+LeftG : LeftSide '->' RightSideGIzq
+
+-- la regla en si para una gramatica derecha
+RightG : LeftSide '->' RightSideGDer
+
+-- la gramatica izquierda completa (todas sus reglas)
 LGrammar  :
           |
 
+-- la gramatica derecha completa (todas sus reglas)
 RGrammar  :
           |
 
-Grammar   : LGrammar                           {  }
-          | RGrammar                           {  }
+-- la gramatica puede ser izquierda o derecha
+Grm   : LGrammar                               { Left $1 } -- LITERALMENTE RECORDE LA EXISTENCIA DE EITHER CUANDO ESCRIBI LEFT Y RIGHT ACA GRACIAS HASKELL POR TANTO VIVA MESSI
+      | RGrammar                               { Right $1 }
+
+----------------------------------------------------
+--- Toda la parte de la estructura OpGram
+--- seria la parte de las operaciones (union interseccion etc)
+----------------------------------------------------
+
+
+Grammar : NT                                   { OpGram $1 } -- seria el nombre, se me ocurre representarlo con NT porque si no tengo que agregar un token name, agregarlo al data y al lexer y es literalmente lo mismo, un string
+        | Grammar '+' Grammar                  { OpUnion $1 $3 }
+        | Grammar '.' Grammar                  { OpIntersec $1 $3 }
+        | Grammar '-' Grammar                  { OpDiff $1 $3 }
+        | Grammar '++' Grammar                 { OpConcat $1 $3 }
+        | Grammar '~'                          { OpComplement $1 }
+        | Grammar '~~'                         { OpReverse $1 }
+        | Grammar '!'                          { OpSide $1 }
+        | '(' Grammar ')'                      { $2 } -- parentesis, no estoy seguro con las precedencias de nada eso incluye la precedencia de la regla esta
 
 Op    : NT '=' Grammar                         { OpDef $1 $3}
       | Grammar '==' Grammar                   { OpEqual $1 $3}
@@ -94,10 +138,16 @@ data Token = TInit
                | TSide
                | TT String
                | TNT String
+               | TOpen
+               | TClose
                | TEOF
                deriving Show
 
-----------------------------------
+--------------------------------------------------------------------
+--- El laboratorio de Lexer 
+--- (jaja chistesito por el laboratorio de Dexter no se suena parecido estoy quemado)
+--------------------------------------------------------------------
+
 lexer cont s = case s of
                     [] -> cont TEOF []
                     ('\n':s)  ->  \line -> lexer cont s (line + 1)
@@ -123,6 +173,8 @@ lexer cont s = case s of
                     ('~':('~':cs)) -> cont TReverse cs
                     ('!':cs) -> cont TSide cs
                     ('"':cs) -> lexT cs
+                    ('(':cs) -> cont TOpen cs
+                    (')':cs) -> cont TClose cs
                     unknown -> \line -> Failed $ 
                      "Línea "++(show line)++": No se puede reconocer "++(show $ take 10 unknown)++ "..."
                     where lexT cs = case span (/= '"') cs of -- anteriormente era con isAlphaNum pero no tuve en cuenta espacios xd
