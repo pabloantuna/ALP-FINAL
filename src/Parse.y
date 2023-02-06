@@ -41,32 +41,61 @@ import Data.Char
 --- onda sus reglas de produccion y eso
 --- lo que se cargaria de un archivo .grm
 ----------------------------------------------------
- 
+
 -- lado izquierdo de una regla de produccion puede tener el simbolo inicial el cual distinguimos del resto por obvias razones, o un simbolo No Terminal (NT)
 LeftSide : '&'                                 { GrmInitial }
          | NT                                  { GrmNT $1 }
 
+-- lado derecho de una regla de produccion para una gramatica que no sabemos si es izquierda o derecha
+RightGGen : T                                  { GrmT $1 }
+          | '\\'                               { GLambda }
+
+RightSideGGen : RightGGen                      { RSGUnit $1 }
+              | RightGGen '|' RightSideGGen    { GOr $1 $3 }
+
 -- lado derecho de una regla de produccion para una gramatica izquierda
-RightSideGIzq : 
-              |
+RightGIzq : NT T                               { GrmLNTT $1 $2 }
+          | '&' T                              { GrmLIT $2 }
+
+RightSideGIzq : RightGIzq                      { RSLUnit $1 }
+              | RightGIzq '|' RightSideGIzq    { LOr $1 $3 }
+              | RightGIzq '|' RightSideGGen    { LOr $1 $3 }
+              | RightGGen '|' RightSideGIzq    { LOr $1 $3 }
 
 -- lado derecho de una regla de produccion para una gramatica derecha
-RightSideGDer :
-              |
+RightGDer : T NT                               { GrmRTNT $1 $2}
+          | T '&'                              { GrmRTI $1 }
+
+RightSideGDer : RightGDer                      { RSRUnit $1 }
+              | RightGDer '|' RightSideGDer    { ROr $1 $3 }
+              | RightGDer '|' RightSideGGen    { ROr $1 $3 }
+              | RightGGen '|' RightSideGDer    { ROr $1 $3 }
+
+-- la regla en si para una gramatica general
+GeneralG : LeftSide '->' RightSideGGen         { GenRule $1 $3 }
 
 -- la regla en si para una gramatica izquierda
-LeftG : LeftSide '->' RightSideGIzq
+LeftG : LeftSide '->' RightSideGIzq            { LeftRule $1 $3 }
 
 -- la regla en si para una gramatica derecha
-RightG : LeftSide '->' RightSideGDer
+RightG : LeftSide '->' RightSideGDer           { RightRule $1 $3 }
 
 -- la gramatica izquierda completa (todas sus reglas)
-LGrammar  :
-          |
+GGrammar  : GeneralG ';'                       { GUnit $1 }
+          | GeneralG ';' GGrammar              { G $1 $3 }
+
+-- la gramatica izquierda completa (todas sus reglas)
+LGrammar  : LeftG ';'                          { LUnit $1 }
+          | LeftG ';' LGrammar                 { L $1 $3 }
+          | LeftG ';' GGrammar                 { L $1 $3 }
+          | GeneralG ';' LGrammar              { L $1 $3 }
+          | GGrammar                           { $1 }
 
 -- la gramatica derecha completa (todas sus reglas)
-RGrammar  :
-          |
+RGrammar  : RightG ';'                         { RUnit $1 }
+          | RightG ';' RGrammar                { R $1 $3 }
+          | RightG ';' GGrammar                { R $1 $3 }
+          | GeneralG ';' RGrammar              { R $1 $3 }
 
 -- la gramatica puede ser izquierda o derecha
 Grm   : LGrammar                               { Left $1 } -- LITERALMENTE RECORDE LA EXISTENCIA DE EITHER CUANDO ESCRIBI LEFT Y RIGHT ACA GRACIAS HASKELL POR TANTO VIVA MESSI
@@ -76,7 +105,6 @@ Grm   : LGrammar                               { Left $1 } -- LITERALMENTE RECOR
 --- Toda la parte de la estructura OpGram
 --- seria la parte de las operaciones (union interseccion etc)
 ----------------------------------------------------
-
 
 Grammar : NT                                   { OpGram $1 } -- seria el nombre, se me ocurre representarlo con NT porque si no tengo que agregar un token name, agregarlo al data y al lexer y es literalmente lo mismo, un string
         | Grammar '+' Grammar                  { OpUnion $1 $3 }
@@ -164,7 +192,7 @@ lexer cont s = case s of
                     ('\\':cs)-> cont TLambda cs
                     (';':cs) -> cont TEnd cs
                     ('?':cs) -> cont TIn cs
-                    ('==':cs) -> cont TEqual cs
+                    ('=':('=':cs)) -> cont TEqual cs
                     ('+':cs) -> cont TUnion cs
                     ('.':cs) -> cont TIntersec cs
                     ('-':cs) -> cont TDiff cs
@@ -178,7 +206,7 @@ lexer cont s = case s of
                     unknown -> \line -> Failed $ 
                      "Línea "++(show line)++": No se puede reconocer "++(show $ take 10 unknown)++ "..."
                     where lexT cs = case span (/= '"') cs of -- anteriormente era con isAlphaNum pero no tuve en cuenta espacios xd
-                              (t, '"':rest) -> cont (T t) rest -- tal vez sacar espacios depende como lo termine manejando pero no me hago problema porque seguro termina siendo agregar un filter o algo por el estilo
+                              (t, '"':rest) -> cont (TT t) rest -- tal vez sacar espacios depende como lo termine manejando pero no me hago problema porque seguro termina siendo agregar un filter o algo por el estilo
                               ([], _) -> \line -> Failed $ "Línea "++(show line)++": El terminal es vacio eso ta raro no?"
                           consumirBK anidado cl cont s = case s of
                               ('-':('-':cs)) -> consumirBK anidado cl cont $ dropWhile ((/=) '\n') cs

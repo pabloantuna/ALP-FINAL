@@ -1,9 +1,26 @@
 module Main where
 
+import           Control.Exception              ( catch
+                                                , IOException
+                                                )
+import           Control.Monad.Except
+import           Data.Char
+import           Data.List
+import           Data.Maybe
+import           Prelude                 hiding ( print )
+import           System.Console.Haskeline
+import qualified Control.Monad.Catch           as MC
+import           System.Environment
+import           System.IO               hiding ( print )
+import           Text.PrettyPrint.HughesPJ      ( render
+                                                , text
+                                                )
+
 import           Common
 import           PPrint
 import           Parse
 import           Eval
+import           Grammar
 
 ---------------------
 --- Interpreter
@@ -29,7 +46,7 @@ data State = S
   ,       -- True, si estamos en modo interactivo.
     lfile :: String
   ,     -- Ultimo archivo cargado (para hacer "reload")
-    ve    :: NameEnv Value Type  -- Entorno con variables globales y su valor  [(Name, (Value, Type))]
+    ve    :: NameEnv
   }
 
 --  read-eval-print loop
@@ -47,7 +64,7 @@ readevalprint args state@(S inter lfile ve) =
             st' <- handleCommand st c
             maybe (return ()) rec st'
   in  do
-        state' <- compileFiles (prelude : args) state
+        state' <- compileFiles args state
         when inter $ lift $ putStrLn
           (  "Intérprete de "
           ++ iname
@@ -67,7 +84,7 @@ data Command = Compile CompileForm
               | Noop
 
 data CompileForm = CompileInteractive  String
-                  | CompileFile         String
+                 | CompileFile         String
 
 interpretCommand :: String -> InputT IO Command
 interpretCommand x = lift $ if isPrefixOf ":" x
@@ -99,19 +116,19 @@ handleCommand state@(S inter lfile ve) cmd = case cmd of
   Noop   -> return (Just state)
   Help   -> lift $ putStr (helpTxt commands) >> return (Just state)
   Browse -> lift $ do
-    putStr (unlines [ s | Global s <- reverse (nub (map fst ve)) ])
+    putStr (unlines [ s | s <- reverse (nub (map fst ve)) ])
     return (Just state)
-  Compile c -> do
+  Compile n c -> do
     state' <- case c of
       CompileInteractive s -> compilePhrase state s
-      CompileFile        f -> compileFile (state { lfile = f }) f
+      CompileFile        f -> compileFile (state { lfile = f }) f n
     return (Just state')
   LPrint s ->
     let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
-    in  printPhrase s' >> return (Just state)
+    in  return (Just state)
   RPrint s ->
     let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
-    in  printPhrase s' >> return (Just state)
+    in  return (Just state)
   Recompile -> if null lfile
     then lift $ putStrLn "No hay un archivo cargado.\n" >> return (Just state)
     else handleCommand state (Compile (CompileFile lfile))
@@ -122,11 +139,11 @@ commands :: [InteractiveCommand]
 commands =
   [ Cmd [":browse"] "" (const Browse) "Ver los nombres en scope"
   , Cmd [":load"]
-        "<file>"
+        "<name> <file>"
         (Compile . CompileFile)
-        "Cargar un programa desde un archivo"
-  , Cmd [":lprint"] "<grm>" Print "Imprime una gramática como gramática izquierda"
-  , Cmd [":rprint"] "<grm>" Print "Imprime una gramática como gramática derecha"
+        "Cargar una gramática desde un archivo y ponerle de nombre <name>"
+  , Cmd [":lprint"] "<grm>" LPrint "Imprime una gramática como gramática izquierda"
+  , Cmd [":rprint"] "<grm>" RPrint "Imprime una gramática como gramática derecha"
   , Cmd [":reload"]
         "<file>"
         (const Recompile)
@@ -157,8 +174,8 @@ compileFiles :: [String] -> State -> InputT IO State
 compileFiles xs s =
   foldM (\s x -> compileFile (s { lfile = x, inter = False }) x) s xs
 
-compileFile :: State -> String -> InputT IO State
-compileFile state@(S inter lfile v) f = do
+compileFile :: State -> String -> String -> InputT IO State
+compileFile state@(S inter lfile v) f name = do
   lift $ putStrLn ("Abriendo " ++ f ++ "...")
   let f' = reverse (dropWhile isSpace (reverse f))
   x <- lift $ Control.Exception.catch
@@ -169,32 +186,20 @@ compileFile state@(S inter lfile v) f = do
               ("No se pudo abrir el archivo " ++ f' ++ ": " ++ err ++ "\n")
       return ""
     )
-  stmts <- parseIO f' (grm_parse) x
-  maybe (return state) (foldM handleStmt state) stmts
+  grm <- parseIO f' (grm_parse) x
+  maybe (return state) (addGrm state name) grm
+
+addGrm :: State -> String -> GrmR -> IO State
+addGrm state name grm = 
+  do 
+    let gram' = gramTermToDFA gram
+    in return (S (replace name gram' (ve state)))
 
 
 compilePhrase :: State -> String -> InputT IO State
 compilePhrase state x = do
-  x' <- parseIO "<interactive>" stmt_parse x
+  x' <- parseIO "<interactive>" op_parse x
   maybe (return state) (handleStmt state) x'
-
-printPhrase :: String -> InputT IO ()
-printPhrase x = do
-  x' <- parseIO "<interactive>" stmt_parse x
-  maybe (return ()) (printStmt . fmap (\y -> (y, conversion y))) x'
-
-printStmt :: Stmt (LamTerm, Term) -> InputT IO ()
-printStmt stmt = lift $ do
-  let outtext = case stmt of
-        Def x (_, e) -> "def " ++ x ++ " = " ++ render (printTerm e)
-        Eval (d, e) ->
-          "LamTerm AST:\n"
-            ++ show d
-            ++ "\n\nTerm AST:\n"
-            ++ show e
-            ++ "\n\nSe muestra como:\n"
-            ++ render (printTerm e)
-  putStrLn outtext
 
 parseIO :: String -> (String -> ParseResult a) -> String -> InputT IO (Maybe a)
 parseIO f p x = lift $ case p x of
@@ -203,12 +208,14 @@ parseIO f p x = lift $ case p x of
     return Nothing
   Ok r -> return (Just r)
 
-handleStmt :: State -> Stmt LamTerm -> InputT IO State
+handleStmt :: State -> Op -> InputT IO State
 handleStmt state stmt = lift $ do
   case stmt of
-    Def x e -> checkType x (conversion e)
-    Eval e  -> checkType it (conversion e)
+    OpDef n g -> addDef n g
+    OpIn s g -> 
+    OpEqual g1 g2 -> 
  where
+  addDef name grm = 
   checkType i t = do
     case infer (ve state) t of
       Left  err -> putStrLn ("Error de tipos: " ++ err) >> return state
