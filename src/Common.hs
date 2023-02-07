@@ -1,7 +1,8 @@
 module Common where
-  -- import Data.List.NonEmpty (NonEmpty)
+  import Data.List.NonEmpty (NonEmpty)
   -- import Control.Monad.State
   import qualified Data.Map.Strict as M
+
   type Name = String
 
   -- GrmRTerm es una gramatica regular vista de forma mas general (si es izq o der esta determinado en otra estructura)
@@ -9,24 +10,18 @@ module Common where
                 | GrmNT String
                 | GrmT String
                 | GLambda
-                | RSGUnit GrmRTerm
                 | GOr GrmRTerm GrmRTerm
                 | GrmLNTT String String
                 | GrmLIT String
-                | RSLUnit GrmRTerm
                 | LOr GrmRTerm GrmRTerm
                 | GrmRTNT String String
                 | GrmRTI String
-                | RSRUnit GrmRTerm
                 | ROr GrmRTerm GrmRTerm
                 | GenRule GrmRTerm GrmRTerm
                 | LeftRule GrmRTerm GrmRTerm
                 | RightRule GrmRTerm GrmRTerm
-                | GUnit GrmRTerm
                 | G GrmRTerm GrmRTerm
-                | LUnit GrmRTerm
                 | L GrmRTerm GrmRTerm
-                | RUnit GrmRTerm
                 | R GrmRTerm GrmRTerm
     deriving Show
 
@@ -35,7 +30,7 @@ module Common where
   -- Either que literalmente es Left 'algo' o Right 'otra cosa'
   -- asi que Left va a ser una gramatica izq y Right una gramatica der
   -- (would be very funny swap it pero se que despues voy a estar enojado conmigo mismo)
-  data GrmR = Either GrmRTerm GrmRTerm
+  type GrmR = Either GrmRTerm GrmRTerm
 
   -- por lo que estuve leyendo se que me voy a tener que meter con pasar
   -- las gramaticas a automatas asi que seguro termino necesitando guardarlas de esa forma
@@ -45,7 +40,7 @@ module Common where
     deriving (Eq, Ord, Show)
 
   -- simbolos automatas deterministas
-  newtype SimbD = SimbD {runSimbD :: String}
+  newtype SimbD = SimbD {runSimbD :: NonEmpty Char} -- no puedo tener empty transition en un dfa (no puedo pasar al siguiente estado usando al cadena vacia)
     deriving (Eq, Ord, Show)
 
   newtype State a = State {runState :: a}

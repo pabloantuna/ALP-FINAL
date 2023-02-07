@@ -50,14 +50,14 @@ LeftSide : '&'                                 { GrmInitial }
 RightGGen : T                                  { GrmT $1 }
           | '\\'                               { GLambda }
 
-RightSideGGen : RightGGen                      { RSGUnit $1 }
+RightSideGGen : RightGGen                      { $1 }
               | RightGGen '|' RightSideGGen    { GOr $1 $3 }
 
 -- lado derecho de una regla de produccion para una gramatica izquierda
 RightGIzq : NT T                               { GrmLNTT $1 $2 }
           | '&' T                              { GrmLIT $2 }
 
-RightSideGIzq : RightGIzq                      { RSLUnit $1 }
+RightSideGIzq : RightGIzq                      { $1 }
               | RightGIzq '|' RightSideGIzq    { LOr $1 $3 }
               | RightGIzq '|' RightSideGGen    { LOr $1 $3 }
               | RightGGen '|' RightSideGIzq    { LOr $1 $3 }
@@ -66,7 +66,7 @@ RightSideGIzq : RightGIzq                      { RSLUnit $1 }
 RightGDer : T NT                               { GrmRTNT $1 $2}
           | T '&'                              { GrmRTI $1 }
 
-RightSideGDer : RightGDer                      { RSRUnit $1 }
+RightSideGDer : RightGDer                      { $1 }
               | RightGDer '|' RightSideGDer    { ROr $1 $3 }
               | RightGDer '|' RightSideGGen    { ROr $1 $3 }
               | RightGGen '|' RightSideGDer    { ROr $1 $3 }
@@ -81,18 +81,18 @@ LeftG : LeftSide '->' RightSideGIzq            { LeftRule $1 $3 }
 RightG : LeftSide '->' RightSideGDer           { RightRule $1 $3 }
 
 -- la gramatica izquierda completa (todas sus reglas)
-GGrammar  : GeneralG ';'                       { GUnit $1 }
+GGrammar  : GeneralG ';'                       { $1 }
           | GeneralG ';' GGrammar              { G $1 $3 }
 
 -- la gramatica izquierda completa (todas sus reglas)
-LGrammar  : LeftG ';'                          { LUnit $1 }
+LGrammar  : LeftG ';'                          { $1 }
           | LeftG ';' LGrammar                 { L $1 $3 }
           | LeftG ';' GGrammar                 { L $1 $3 }
           | GeneralG ';' LGrammar              { L $1 $3 }
           | GGrammar                           { $1 }
 
 -- la gramatica derecha completa (todas sus reglas)
-RGrammar  : RightG ';'                         { RUnit $1 }
+RGrammar  : RightG ';'                         { $1 }
           | RightG ';' RGrammar                { R $1 $3 }
           | RightG ';' GGrammar                { R $1 $3 }
           | GeneralG ';' RGrammar              { R $1 $3 }
