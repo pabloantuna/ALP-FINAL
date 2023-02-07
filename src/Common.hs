@@ -1,7 +1,8 @@
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
 module Common where
   import Data.List.NonEmpty (NonEmpty)
   -- import Control.Monad.State
-  import qualified Data.Map.Strict as M
+  -- import qualified Data.Map.Strict as M
 
   type Name = String
 
@@ -43,26 +44,27 @@ module Common where
   newtype SimbD = SimbD {runSimbD :: NonEmpty Char} -- no puedo tener empty transition en un dfa (no puedo pasar al siguiente estado usando al cadena vacia)
     deriving (Eq, Ord, Show)
 
-  newtype State a = State {runState :: a}
+  newtype St a = St {runSt :: a}
     deriving (Eq, Ord, Show)
 
-  -- relacion
-  newtype Rel a = Rel [(State a, SimbND, State a)]
+  -- relacion de transición
+  newtype RelT a = RelT [(St a, SimbND, St a)]
     deriving Show
 
-  -- funcion
-  newtype F a = F [(State a, SimbD, State a)]
+  -- funcion de transición
+  newtype FunT a = FunT [(St a, SimbD, St a)]
     deriving Show
 
-  data AEFD a = D [SimbD] [State a] (F a) [State a] (State a)
+  -- alfabeto - lista de estados - funcion de transicion - estados de aceptacion - estado inicial
+  data AEFD a = D [SimbD] [St a] (FunT a) [St a] (St a) Bool  -- el bool es para indicar si era izq o der. false -> izq, true -> der
 
-  data AEFND a = ND [SimbND] [State a] (Rel a) [State a] (State a)
+  data AEFND a = ND [SimbND] [St a] (RelT a) [St a] (St a) Bool  -- el bool es para indicar si era izq o der. false -> izq, true -> der
 
-  newtype AEFDG = AEFD (Int, Bool) -- el bool es para indicar si era izq o der. false -> izq, true -> der
+  type AEFDG = AEFD Int
 
   -- entorno de gramaticas con sus nombres
-  -- type Env = [(Name, AEFDG)]
-  type Env = M.Map Name AEFDG
+  type Env = [(Name, AEFDG)]
+  -- type Env = M.Map Name AEFDG
 
   -- la parte de operaciones (union interseccion definicion etc)
   data Op = OpDef Name OpGram
