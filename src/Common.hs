@@ -33,6 +33,30 @@ module Common where
   -- (would be very funny swap it pero se que despues voy a estar enojado conmigo mismo)
   type GrmR = Either GrmRTerm GrmRTerm
 
+  -- los terminales (esto inicialmente lo habia pensado como simplemente hacerlo string y no un newtype pero quiero probar asi porque se ve mas indicativo de que es)
+  newtype T = T { runT :: String }
+    deriving (Eq, Ord, Show)
+  
+  -- los no terminales (esto inicialmente lo habia pensado como simplemente hacerlo string y no un newtype pero quiero probar asi porque se ve mas indicativo de que es)
+  newtype NT = NT { runNT :: String }
+    deriving (Eq, Ord, Show)
+
+  -- regla de produccion gram izquierda
+  data RulesL = RLT NT T
+              | RLNT NT NT T
+              | RLL NT -- lambda, el NT este genera la cadena vacia
+
+  -- regla de produccion gram der
+  data RulesR = RRT NT T
+              | RRNT NT T NT
+              | RRL NT -- lambda, el NT este genera la cadena vacia
+
+  data LGrm = LG [T] [NT] [RulesL]
+
+  data RGrm = RG [T] [NT] [RulesR]
+
+  type Grm = Either LGrm RGrm
+
   -- por lo que estuve leyendo se que me voy a tener que meter con pasar
   -- las gramaticas a automatas asi que seguro termino necesitando guardarlas de esa forma
   -- pero esto esta completamente en borrador tengo que seguir leyendo about it

@@ -32,7 +32,7 @@ main = runInputT defaultSettings main'
 main' :: InputT IO ()
 main' = do
   args <- lift getArgs
-  readevalprint args (S True "" [])
+  readevalprint args (S True [])
 
 iname, iprompt :: String
 iname = "Gramaticas Regulares"
@@ -44,14 +44,12 @@ ioExceptionCatcher _ = return Nothing
 data State = S
   { inter :: Bool
   ,       -- True, si estamos en modo interactivo.
-    lfile :: String
-  ,     -- Ultimo archivo cargado (para hacer "reload")
-    ve    :: NameEnv
+    env    :: Env
   }
 
 --  read-eval-print loop
 readevalprint :: [String] -> State -> InputT IO ()
-readevalprint args state@(S inter lfile ve) =
+readevalprint args state@(S inter env) =
   let rec st = do
         mx <- MC.catch
           (if inter then getInputLine iprompt else lift $ fmap Just getLine)
@@ -64,7 +62,6 @@ readevalprint args state@(S inter lfile ve) =
             st' <- handleCommand st c
             maybe (return ()) rec st'
   in  do
-        state' <- compileFiles args state
         when inter $ lift $ putStrLn
           (  "Intérprete de "
           ++ iname
@@ -72,25 +69,24 @@ readevalprint args state@(S inter lfile ve) =
           ++ "Escriba :? para recibir ayuda."
           )
         --  enter loop
-        rec state' { inter = True }
+        rec state { inter = True }
 
-data Command = Compile CompileForm
+data Command = Compile String String
               | LPrint String
               | RPrint String
-              | Recompile
               | Browse
               | Quit
               | Help
               | Noop
-
-data CompileForm = CompileInteractive  String
-                 | CompileFile         String
+              | Interactive String
 
 interpretCommand :: String -> InputT IO Command
 interpretCommand x = lift $ if isPrefixOf ":" x
   then do
-    let (cmd, t') = break isSpace x
-    let t         = dropWhile isSpace t'
+    let (cmd, rest') = break isSpace x
+    let rest         = dropWhile isSpace rest'
+    let (t, tt')     = break isSpace rest
+    let tt           = dropWhile isSpace tt'
     --  find matching commands
     let matching = filter (\(Cmd cs _ _ _) -> any (isPrefixOf cmd) cs) commands
     case matching of
@@ -100,7 +96,7 @@ interpretCommand x = lift $ if isPrefixOf ":" x
           )
         return Noop
       [Cmd _ _ f _] -> do
-        return (f t)
+        return (f t tt)
       _ -> do
         putStrLn
           (  "Comando ambigüo, podría ser "
@@ -108,20 +104,18 @@ interpretCommand x = lift $ if isPrefixOf ":" x
           ++ "."
           )
         return Noop
-  else return (Compile (CompileInteractive x))
+  else return (Interactive x)
 
 handleCommand :: State -> Command -> InputT IO (Maybe State)
-handleCommand state@(S inter lfile ve) cmd = case cmd of
+handleCommand state@(S inter env) cmd = case cmd of
   Quit   -> lift $ when (not inter) (putStrLn "!@#$^&*") >> return Nothing
   Noop   -> return (Just state)
   Help   -> lift $ putStr (helpTxt commands) >> return (Just state)
   Browse -> lift $ do
-    putStr (unlines [ s | s <- reverse (nub (map fst ve)) ])
+    putStr (unlines [ s | s <- reverse (nub (map fst env)) ])
     return (Just state)
   Compile n c -> do
-    state' <- case c of
-      CompileInteractive s -> compilePhrase state s
-      CompileFile        f -> compileFile (state { lfile = f }) f n
+    state' <- compileFile state c n
     return (Just state')
   LPrint s ->
     let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
@@ -129,27 +123,20 @@ handleCommand state@(S inter lfile ve) cmd = case cmd of
   RPrint s ->
     let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
     in  return (Just state)
-  Recompile -> if null lfile
-    then lift $ putStrLn "No hay un archivo cargado.\n" >> return (Just state)
-    else handleCommand state (Compile (CompileFile lfile))
+  Interactive s -> do
+    state' <- compilePhrase state s
+    return $ Just state'
 
-data InteractiveCommand = Cmd [String] String (String -> Command) String
+data InteractiveCommand = Cmd [String] String (String -> String -> Command) String
 
 commands :: [InteractiveCommand]
 commands =
-  [ Cmd [":browse"] "" (const Browse) "Ver los nombres en scope"
-  , Cmd [":load"]
-        "<name> <file>"
-        (Compile . CompileFile)
-        "Cargar una gramática desde un archivo y ponerle de nombre <name>"
-  , Cmd [":lprint"] "<grm>" LPrint "Imprime una gramática como gramática izquierda"
-  , Cmd [":rprint"] "<grm>" RPrint "Imprime una gramática como gramática derecha"
-  , Cmd [":reload"]
-        "<file>"
-        (const Recompile)
-        "Volver a cargar el último archivo"
-  , Cmd [":quit"]       ""       (const Quit) "Salir del intérprete"
-  , Cmd [":help", ":?"] ""       (const Help) "Mostrar esta lista de comandos"
+  [ Cmd [":browse"] "" (const (const Browse)) "Ver los nombres en scope"
+  , Cmd [":load"] "<name> <file>" (Compile) "Cargar una gramática desde un archivo y ponerle de nombre <name>"
+  , Cmd [":lprint"] "<grm>" (const LPrint) "Imprime una gramática como gramática izquierda"
+  , Cmd [":rprint"] "<grm>" (const RPrint) "Imprime una gramática como gramática derecha"
+  , Cmd [":quit"]       ""       (const (const Quit)) "Salir del intérprete"
+  , Cmd [":help", ":?"] ""       (const (const Help)) "Mostrar esta lista de comandos"
   ]
 
 helpTxt :: [InteractiveCommand] -> String
@@ -170,12 +157,8 @@ helpTxt cs =
            cs
          )
 
-compileFiles :: [String] -> State -> InputT IO State
-compileFiles xs s =
-  foldM (\s x -> compileFile (s { lfile = x, inter = False }) x) s xs
-
 compileFile :: State -> String -> String -> InputT IO State
-compileFile state@(S inter lfile v) f name = do
+compileFile state@(S inter v) f name = do
   lift $ putStrLn ("Abriendo " ++ f ++ "...")
   let f' = reverse (dropWhile isSpace (reverse f))
   x <- lift $ Control.Exception.catch
@@ -186,15 +169,26 @@ compileFile state@(S inter lfile v) f name = do
               ("No se pudo abrir el archivo " ++ f' ++ ": " ++ err ++ "\n")
       return ""
     )
-  grm <- parseIO f' (grm_parse) x
+  grm <- do g <- parseIO f' (grm_parse) x
+            return (maybe Nothing (\x -> Just x) g)
+  lift $ putStrLn $ show $ pipo grm
   maybe (return state) (addGrm state name) grm
 
-addGrm :: State -> String -> GrmR -> IO State
-addGrm state name grm = 
-  do 
-    let gram' = gramTermToDFA gram
-    in return (S (replace name gram' (ve state)))
+-- pipo :: GrmR -> String
+pipo gm = case gm of
+            Nothing -> "no amigo mal ahi"
+            Just x -> show x
 
+addGrm :: State -> String -> GrmR -> InputT IO State
+addGrm state@(S inter env) name grm = 
+  do 
+    let grm' = grmRToAEFD grm
+     in return (S inter (replace name grm' env))
+
+replace :: String -> AEFDG -> Env -> Env
+replace name gram [] = [(name, gram)]
+replace name gram ((n,g):xs) = if name==n then ((n,gram):xs)
+                                          else ((n,g):(replace name gram xs))
 
 compilePhrase :: State -> String -> InputT IO State
 compilePhrase state x = do
@@ -212,21 +206,10 @@ handleStmt :: State -> Op -> InputT IO State
 handleStmt state stmt = lift $ do
   case stmt of
     OpDef n g -> addDef n g
-    OpIn s g -> 
-    OpEqual g1 g2 -> 
+    OpIn s g -> putStrLn "tuturu" >> return state
+    OpEqual g1 g2 -> putStrLn "no hay tuturu" >> return state
  where
-  addDef name grm = 
-  checkType i t = do
-    case infer (ve state) t of
-      Left  err -> putStrLn ("Error de tipos: " ++ err) >> return state
-      Right ty  -> checkEval i t ty
-  checkEval i t ty = do
-    let v = eval (ve state) t
-    _ <- when (inter state) $ do
-      let outtext =
-            if i == it then render (printTerm (quote v)) else render (text i)
-      putStrLn outtext
-    return (state { ve = (Global i, (v, ty)) : ve state })
+  addDef name grm = return state
 
 it :: String
 it = "it"

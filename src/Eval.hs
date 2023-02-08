@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections #-}
-module Eval 
+module Eval
   ( evalOp )
 where
 
@@ -9,7 +9,7 @@ import FiniteAutomata
 import Control.Monad
 import qualified Data.Map.Strict as M
 -- Mónada estado, con manejo de errores
-newtype StateError a = 
+newtype StateError a =
   StateError { runStateError :: Env -> Either String (a, Env) }
 
 -- Para calmar al GHC
@@ -35,8 +35,10 @@ instance MonadError StateError where
 instance MonadState StateError where
   lookfor v = StateError $ lookfor' v
     where
-      lookfor' vv s = maybe (Left ("Variable " ++ vv ++ " no definida")) (Right . (, s)) $ M.lookup vv s
-  update v i = StateError (\s -> Right ((), M.insert v i s))
+      lookfor' vv s = maybe (Left ("Variable " ++ vv ++ " no definida")) (Right . (, s)) $ lookup vv s
+  update v i = StateError (\s -> Right ((), update' v i s))
+    where update' vu iu [] = [(vu, iu)]
+          update' vu iu ((x, y):xs) = if vu == x then (vu,iu):xs else (x,y):update' vu iu xs
 
 
 evalOp :: (MonadState m, MonadError m) => OpGram -> m AEFDG

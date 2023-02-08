@@ -29,8 +29,8 @@ import Data.Char
     '~'            { TComplement }            -- para el complemento de una gramatica (casi seguro que ~ es literalmente el simbolo de complemento de conjunto en algun lado)
     '~~'           { TReverse }               -- para hacer el reverso de una gramatica (aca de nuevo me quede sin ideas de simbolos)
     '!'            { TSide }                  -- para pasar de derecha (izquierda) a izquierda (derecha) (aca nuevamente me quede sin ideas de simbolos je)
-    T              { TT $$}                   -- los simbolos terminales
-    NT             { TNT $$}                  -- los simbolos no terminales
+    T              { TT $$ }                  -- los simbolos terminales
+    NT             { TNT $$ }                 -- los simbolos no terminales
     '('            { TOpen }                  -- abrir parentesis para tener cosas como g1 + (g2 - g3)
     ')'            { TClose }                 -- cerrar parentesis para lo mismo obviamente je
 
@@ -86,16 +86,16 @@ GGrammar  : GeneralG ';'                       { $1 }
 
 -- la gramatica izquierda completa (todas sus reglas)
 LGrammar  : LeftG ';'                          { $1 }
-          | LeftG ';' LGrammar                 { L $1 $3 }
-          | LeftG ';' GGrammar                 { L $1 $3 }
-          | GeneralG ';' LGrammar              { L $1 $3 }
+          | LeftG ';' LGrammar                 { G $1 $3 }
+          | LeftG ';' GGrammar                 { G $1 $3 }
+          | GeneralG ';' LGrammar              { G $1 $3 }
           | GGrammar                           { $1 }
 
 -- la gramatica derecha completa (todas sus reglas)
 RGrammar  : RightG ';'                         { $1 }
-          | RightG ';' RGrammar                { R $1 $3 }
-          | RightG ';' GGrammar                { R $1 $3 }
-          | GeneralG ';' RGrammar              { R $1 $3 }
+          | RightG ';' RGrammar                { G $1 $3 }
+          | RightG ';' GGrammar                { G $1 $3 }
+          | GeneralG ';' RGrammar              { G $1 $3 }
 
 -- la gramatica puede ser izquierda o derecha
 Grm   : LGrammar                               { Left $1 } -- LITERALMENTE RECORDE LA EXISTENCIA DE EITHER CUANDO ESCRIBI LEFT Y RIGHT ACA GRACIAS HASKELL POR TANTO VIVA MESSI
@@ -116,9 +116,9 @@ Grammar : NT                                   { OpGram $1 } -- seria el nombre,
         | Grammar '!'                          { OpSide $1 }
         | '(' Grammar ')'                      { $2 } -- parentesis, no estoy seguro con las precedencias de nada eso incluye la precedencia de la regla esta
 
-Op    : NT '=' Grammar                         { OpDef $1 $3}
-      | Grammar '==' Grammar                   { OpEqual $1 $3}
-      | T '?' Grammar                          { OpIn $1 $3}
+Op    : NT '=' Grammar                         { OpDef $1 $3 }
+      | Grammar '==' Grammar                   { OpEqual $1 $3 }
+      | T '?' Grammar                          { OpIn $1 $3 }
      
 {
 
