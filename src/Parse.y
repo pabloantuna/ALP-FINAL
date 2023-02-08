@@ -7,7 +7,7 @@ import Data.Char
 }
 
 %monad { P } { thenP } { returnP }
-%name parseGrm Grm
+%name parseGram Gram
 %name parseOp Op
 
 %tokentype { Token }
@@ -43,63 +43,44 @@ import Data.Char
 ----------------------------------------------------
 
 -- lado izquierdo de una regla de produccion puede tener el simbolo inicial el cual distinguimos del resto por obvias razones, o un simbolo No Terminal (NT)
-LeftSide : '&'                                 { GrmInitial }
-         | NT                                  { GrmNT $1 }
-
--- lado derecho de una regla de produccion para una gramatica que no sabemos si es izquierda o derecha
-RightGGen : T                                  { GrmT $1 }
-          | '\\'                               { GLambda }
-
-RightSideGGen : RightGGen                      { $1 }
-              | RightGGen '|' RightSideGGen    { GOr $1 $3 }
+LeftSide : '&'                                 { Initial }
+         | NT                                  { NT $1 }
 
 -- lado derecho de una regla de produccion para una gramatica izquierda
-RightGIzq : NT T                               { GrmLNTT $1 $2 }
-          | '&' T                              { GrmLIT $2 }
+RightGIzq : NT T                               { RTNT (T $2) (NT $1) }
+          | '&' T                              { RTNT (T $2) Initial }
+          | T                                  { RT (T $1) }
+          | '\\'                               { RL }
 
-RightSideGIzq : RightGIzq                      { $1 }
-              | RightGIzq '|' RightSideGIzq    { LOr $1 $3 }
-              | RightGIzq '|' RightSideGGen    { LOr $1 $3 }
-              | RightGGen '|' RightSideGIzq    { LOr $1 $3 }
+RightSideGIzq : RightGIzq                      { [$1] }
+              | RightGIzq '|' RightSideGIzq    { $1 : $3 }
 
 -- lado derecho de una regla de produccion para una gramatica derecha
-RightGDer : T NT                               { GrmRTNT $1 $2}
-          | T '&'                              { GrmRTI $1 }
+RightGDer : T NT                               { RTNT (T $1) (NT $2)}
+          | T '&'                              { RTNT (T $1) Initial }
+          | T                                  { RT (T $1) }
+          | '\\'                               { RL }
 
-RightSideGDer : RightGDer                      { $1 }
-              | RightGDer '|' RightSideGDer    { ROr $1 $3 }
-              | RightGDer '|' RightSideGGen    { ROr $1 $3 }
-              | RightGGen '|' RightSideGDer    { ROr $1 $3 }
-
--- la regla en si para una gramatica general
-GeneralG : LeftSide '->' RightSideGGen         { GenRule $1 $3 }
+RightSideGDer : RightGDer                      { [$1] }
+              | RightGDer '|' RightSideGDer    { $1 : $3 }
 
 -- la regla en si para una gramatica izquierda
-LeftG : LeftSide '->' RightSideGIzq            { LeftRule $1 $3 }
+LeftG : LeftSide '->' RightSideGIzq            { Rule $1 $3 }
 
 -- la regla en si para una gramatica derecha
-RightG : LeftSide '->' RightSideGDer           { RightRule $1 $3 }
+RightG : LeftSide '->' RightSideGDer           { Rule $1 $3 }
 
 -- la gramatica izquierda completa (todas sus reglas)
-GGrammar  : GeneralG ';'                       { $1 }
-          | GeneralG ';' GGrammar              { G $1 $3 }
-
--- la gramatica izquierda completa (todas sus reglas)
-LGrammar  : LeftG ';'                          { $1 }
-          | LeftG ';' LGrammar                 { G $1 $3 }
-          | LeftG ';' GGrammar                 { G $1 $3 }
-          | GeneralG ';' LGrammar              { G $1 $3 }
-          | GGrammar                           { $1 }
+LGrammar  : LeftG ';'                          { [$1] }
+          | LeftG ';' LGrammar                 { $1 : $3 }
 
 -- la gramatica derecha completa (todas sus reglas)
-RGrammar  : RightG ';'                         { $1 }
-          | RightG ';' RGrammar                { G $1 $3 }
-          | RightG ';' GGrammar                { G $1 $3 }
-          | GeneralG ';' RGrammar              { G $1 $3 }
+RGrammar  : RightG ';'                         { [$1] }
+          | RightG ';' RGrammar                { $1 : $3 }
 
 -- la gramatica puede ser izquierda o derecha
-Grm   : LGrammar                               { Left $1 } -- LITERALMENTE RECORDE LA EXISTENCIA DE EITHER CUANDO ESCRIBI LEFT Y RIGHT ACA GRACIAS HASKELL POR TANTO VIVA MESSI
-      | RGrammar                               { Right $1 }
+Gram  : LGrammar                               { Left (Gram $1) } -- LITERALMENTE RECORDE LA EXISTENCIA DE EITHER CUANDO ESCRIBI LEFT Y RIGHT ACA GRACIAS HASKELL POR TANTO VIVA MESSI
+      | RGrammar                               { Right (Gram $1) }
 
 ----------------------------------------------------
 --- Toda la parte de la estructura OpGram
@@ -219,6 +200,6 @@ lexer cont s = case s of
                           lexNT cs = case span isAlphaNum cs of
                               (nt, rest) -> cont (TNT nt) rest
                                            
-grm_parse s = parseGrm s 1
+gram_parse s = parseGram s 1
 op_parse s = parseOp s 1
 }

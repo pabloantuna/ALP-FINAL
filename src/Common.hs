@@ -6,56 +6,56 @@ module Common where
 
   type Name = String
 
-  -- GrmRTerm es una gramatica regular vista de forma mas general (si es izq o der esta determinado en otra estructura)
-  data GrmRTerm = GrmInitial 
-                | GrmNT String
-                | GrmT String
-                | GLambda
-                | GOr GrmRTerm GrmRTerm
-                | GrmLNTT String String
-                | GrmLIT String
-                | LOr GrmRTerm GrmRTerm
-                | GrmRTNT String String
-                | GrmRTI String
-                | ROr GrmRTerm GrmRTerm
-                | GenRule GrmRTerm GrmRTerm
-                | LeftRule GrmRTerm GrmRTerm
-                | RightRule GrmRTerm GrmRTerm
-                | G GrmRTerm GrmRTerm
-                | L GrmRTerm GrmRTerm
-                | R GrmRTerm GrmRTerm
+  -- GramTerm es una gramatica regular vista de forma mas general (si es izq o der esta determinado en otra estructura)
+  newtype GramTerm = Gram [Rule]
     deriving Show
 
-  -- la gramatica regualr puede ser izquierda o derecha
-  -- la buena noticia de usar haskell es que tenemos
+  -- una regla de produccion de una gramatica esta dada por
+  -- un no terminal que seria A en A -> generacion1 | generacion2 y una lista que seria [generacion1, generacion2]
+  data Rule = Rule NT [RigthSide]
+    deriving Show
+
+  -- no terminal
+  data NT = NT String | Initial
+    deriving (Eq, Ord, Show)
+
+  -- terminal  
+  newtype T = T {runT :: String}
+   deriving (Eq, Ord, Show)
+
+  data RigthSide = RT T | RTNT T NT | RL
+    deriving Show
+
+  -- la gramatica regular puede ser izquierda o derecha
+  -- lo bueno de usar haskell es que tenemos
   -- Either que literalmente es Left 'algo' o Right 'otra cosa'
   -- asi que Left va a ser una gramatica izq y Right una gramatica der
   -- (would be very funny swap it pero se que despues voy a estar enojado conmigo mismo)
-  type GrmR = Either GrmRTerm GrmRTerm
+  type Gram = Either GramTerm GramTerm
 
   -- los terminales (esto inicialmente lo habia pensado como simplemente hacerlo string y no un newtype pero quiero probar asi porque se ve mas indicativo de que es)
-  newtype T = T { runT :: String }
-    deriving (Eq, Ord, Show)
+  -- newtype T = T { runT :: String }
+  --   deriving (Eq, Ord, Show)
   
   -- los no terminales (esto inicialmente lo habia pensado como simplemente hacerlo string y no un newtype pero quiero probar asi porque se ve mas indicativo de que es)
-  newtype NT = NT { runNT :: String }
-    deriving (Eq, Ord, Show)
+  -- newtype NT = NT { runNT :: String }
+  --   deriving (Eq, Ord, Show)
 
   -- regla de produccion gram izquierda
-  data RulesL = RLT NT T
-              | RLNT NT NT T
-              | RLL NT -- lambda, el NT este genera la cadena vacia
+  -- data RulesL = RLT NT T
+  --             | RLNT NT NT T
+  --             | RLL NT -- lambda, el NT este genera la cadena vacia
 
   -- regla de produccion gram der
-  data RulesR = RRT NT T
-              | RRNT NT T NT
-              | RRL NT -- lambda, el NT este genera la cadena vacia
+  -- data RulesR = RRT NT T
+  --             | RRNT NT T NT
+  --             | RRL NT -- lambda, el NT este genera la cadena vacia
 
-  data LGrm = LG [T] [NT] [RulesL]
+  -- data LGrm = LG [T] [NT] [RulesL]
 
-  data RGrm = RG [T] [NT] [RulesR]
+  -- data RGrm = RG [T] [NT] [RulesR]
 
-  type Grm = Either LGrm RGrm
+  -- type Grm = Either LGrm RGrm
 
   -- por lo que estuve leyendo se que me voy a tener que meter con pasar
   -- las gramaticas a automatas asi que seguro termino necesitando guardarlas de esa forma

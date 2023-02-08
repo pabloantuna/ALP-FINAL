@@ -106,6 +106,9 @@ interpretCommand x = lift $ if isPrefixOf ":" x
         return Noop
   else return (Interactive x)
 
+validExtension :: String -> Bool
+validExtension = isSuffixOf ".grm"
+
 handleCommand :: State -> Command -> InputT IO (Maybe State)
 handleCommand state@(S inter env) cmd = case cmd of
   Quit   -> lift $ when (not inter) (putStrLn "!@#$^&*") >> return Nothing
@@ -114,9 +117,11 @@ handleCommand state@(S inter env) cmd = case cmd of
   Browse -> lift $ do
     putStr (unlines [ s | s <- reverse (nub (map fst env)) ])
     return (Just state)
-  Compile n c -> do
-    state' <- compileFile state c n
-    return (Just state')
+  Compile n f -> if validExtension f 
+    then do
+      state' <- compileFile state f n
+      return (Just state')
+    else lift $ putStrLn "El archivo debe ser de extension .grm" >> return (Just state)
   LPrint s ->
     let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
     in  return (Just state)
@@ -132,9 +137,9 @@ data InteractiveCommand = Cmd [String] String (String -> String -> Command) Stri
 commands :: [InteractiveCommand]
 commands =
   [ Cmd [":browse"] "" (const (const Browse)) "Ver los nombres en scope"
-  , Cmd [":load"] "<name> <file>" (Compile) "Cargar una gramática desde un archivo y ponerle de nombre <name>"
-  , Cmd [":lprint"] "<grm>" (const LPrint) "Imprime una gramática como gramática izquierda"
-  , Cmd [":rprint"] "<grm>" (const RPrint) "Imprime una gramática como gramática derecha"
+  , Cmd [":load"] "<name> <file>" Compile "Cargar una gramática desde un archivo y ponerle de nombre <name>"
+  , Cmd [":lprint"] "<gram>" (const LPrint) "Imprime una gramática como gramática izquierda"
+  , Cmd [":rprint"] "<gram>" (const RPrint) "Imprime una gramática como gramática derecha"
   , Cmd [":quit"]       ""       (const (const Quit)) "Salir del intérprete"
   , Cmd [":help", ":?"] ""       (const (const Help)) "Mostrar esta lista de comandos"
   ]
@@ -169,21 +174,21 @@ compileFile state@(S inter v) f name = do
               ("No se pudo abrir el archivo " ++ f' ++ ": " ++ err ++ "\n")
       return ""
     )
-  grm <- do g <- parseIO f' (grm_parse) x
-            return (maybe Nothing (\x -> Just x) g)
-  lift $ putStrLn $ show $ pipo grm
-  maybe (return state) (addGrm state name) grm
+  gram <- do g <- parseIO f' (gram_parse) x
+             return (maybe Nothing (\x -> Just x) g)
+  lift $ putStrLn $ show $ pipo gram
+  maybe (return state) (addGram state name) gram
 
--- pipo :: GrmR -> String
+-- pipo :: Gram -> String
 pipo gm = case gm of
             Nothing -> "no amigo mal ahi"
             Just x -> show x
 
-addGrm :: State -> String -> GrmR -> InputT IO State
-addGrm state@(S inter env) name grm = 
+addGram :: State -> String -> Gram -> InputT IO State
+addGram state@(S inter env) name gram = 
   do 
-    let grm' = grmRToAEFD grm
-     in return (S inter (replace name grm' env))
+    let gram' = gramToAEFD gram
+     in return (S inter (replace name gram' env))
 
 replace :: String -> AEFDG -> Env -> Env
 replace name gram [] = [(name, gram)]
@@ -209,7 +214,7 @@ handleStmt state stmt = lift $ do
     OpIn s g -> putStrLn "tuturu" >> return state
     OpEqual g1 g2 -> putStrLn "no hay tuturu" >> return state
  where
-  addDef name grm = return state
+  addDef name gram = return state
 
 it :: String
 it = "it"

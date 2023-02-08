@@ -7,7 +7,7 @@ import Common
 import Monads
 import FiniteAutomata
 import Control.Monad
-import qualified Data.Map.Strict as M
+-- import qualified Data.Map.Strict as M
 -- Mónada estado, con manejo de errores
 newtype StateError a =
   StateError { runStateError :: Env -> Either String (a, Env) }
