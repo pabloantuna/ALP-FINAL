@@ -59,7 +59,6 @@ evalOp (OpConcat og1 og2) = do
   og1' <- evalOp og1
   og2' <- evalOp og2
   return $ concatAefd og1' og2'
--- evalOp (OpComplement og) = evalOp og >>= (return . complementAefd)
 evalOp (OpComplement og) = do
   og' <- evalOp og
   return $ complementAefd og'
