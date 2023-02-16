@@ -43,9 +43,13 @@ library
     , base >=4.7 && <5
     , containers
     , exceptions
+    , extra
     , haskeline >=0.8.0.0
     , mtl
     , pretty
+    , prettyprinter
+    , prettyprinter-ansi-terminal
+    , text
   default-language: Haskell2010
 
 executable ALP-FINAL-exe
@@ -64,9 +68,13 @@ executable ALP-FINAL-exe
     , base >=4.7 && <5
     , containers
     , exceptions
+    , extra
     , haskeline >=0.8.0.0
     , mtl
     , pretty
+    , prettyprinter
+    , prettyprinter-ansi-terminal
+    , text
   default-language: Haskell2010
 
 test-suite ALP-FINAL-test
@@ -84,7 +92,11 @@ test-suite ALP-FINAL-test
     , base >=4.7 && <5
     , containers
     , exceptions
+    , extra
     , haskeline >=0.8.0.0
     , mtl
     , pretty
+    , prettyprinter
+    , prettyprinter-ansi-terminal
+    , text
   default-language: Haskell2010

@@ -28,6 +28,10 @@ dependencies:
 - exceptions
 - QuickCheck
 - containers
+- prettyprinter
+- prettyprinter-ansi-terminal
+- extra
+- text
 
 ghc-options:
 - -Wall
