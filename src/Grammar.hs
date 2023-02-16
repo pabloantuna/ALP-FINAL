@@ -1,8 +1,9 @@
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
 module Grammar where
 
 import Common
 import FiniteAutomata
-import Data.List ( union )
+import Data.List ( nub )
 
 -- funcion para obtener a partir de una lista del lado derecho de una regla de produccion
 -- una tupla con dos listas
@@ -33,8 +34,8 @@ tsNTsFromRules :: [Rule] -> ([T], [NT])
 tsNTsFromRules [] = ([], [])
 tsNTsFromRules (x:xs) = let (ts', nts') = tsNTsFromRules xs
                             (tss, ntss) = tsNTsFromRule x
-                            ts = union tss ts'
-                            nts = union ntss nts'
+                            ts = nub $ tss ++ ts'
+                            nts = nub $ ntss ++ nts'
                           in (ts, nts)
 
 
@@ -45,7 +46,7 @@ tsNTsFromRules (x:xs) = let (ts', nts') = tsNTsFromRules xs
 -- i.e unifica las reglas de la lista con la regla que se toma como primer arg
 unificarRules' :: Rule -> [Rule] -> (Rule, [Rule])
 unificarRules' r [] = (r, [])
-unificarRules' r@(Rule nt rs) (r2@(Rule nt' rs'):xs) | nt == nt' = let (nr, rest) = unificarRules' (Rule nt (rs `union` rs')) xs
+unificarRules' r@(Rule nt rs) (r2@(Rule nt' rs'):xs) | nt == nt' = let (nr, rest) = unificarRules' (Rule nt (nub $ rs ++ rs')) xs
                                                                 in (nr, rest)
                                                      | otherwise = let (nr, rest) = unificarRules' r xs
                                                                 in (nr, r2:rest)
@@ -107,11 +108,23 @@ gramTermDerToAEFND (Gram rus) = let rules = unificarRules rus -- unifico las reg
                                     (ts, nts) = tsNTsFromRules rules -- obtengo los terminales y no terminales
                                     simb = map (SimbND . runT) ts -- los simbolos (alfabeto) del automata son los terminales de la gramatica
                                     sts  = St Nothing : map (St . Just . ntToString) nts -- los estados seran el nuevo estado de aceptacion Nothing + todos los no terminales
-                                    r    = RelT (([((St . Just . ntToString) st1, (SimbND . runT) t, (St . Just . ntToString) st1) | st1 <- nts, t <- ts, st2 <- nts, isRel st1 t st2 rules]) `union` -- las relaciones que permiten pasar de un estado a otro (la regla NT -> NT' => existe una relacion (NT, "", NT'))
-                                                ([((St . Just . ntToString) st1, (SimbND . runT) t, St Nothing) | st1 <- nts, t <- ts, acceptTerminal st1 t rules])) -- los estados que aceptan la entrada de un terminal pero no van a ningun otro estado (NT -> t => consumiendo t voy a Nothing, i.e existe la relacion (NT, t, Nothing))
+                                    r    = RelT (nub $ ([((St . Just . ntToString) st1, (SimbND . runT) t, (St . Just . ntToString) st2) | st1 <- nts, t <- ts, st2 <- nts, isRel st1 t st2 rules]) -- las relaciones que permiten pasar de un estado a otro (la regla NT -> NT' => existe una relacion (NT, "", NT'))
+                                                    ++ ([((St . Just . ntToString) st1, (SimbND . runT) t, St Nothing) | st1 <- nts, t <- ts, acceptTerminal st1 t rules])) -- los estados que aceptan la entrada de un terminal pero no van a ningun otro estado (NT -> t => consumiendo t voy a Nothing, i.e existe la relacion (NT, t, Nothing))
                                     stsa = St Nothing : [(St . Just . ntToString) nt | nt <- nts, isEstAcep nt rules] -- los estados de aceptacion son el nuevo estado Nothing + los estados que acepten la cadena vacia
                                     sti  = St (Just "&") -- el estado inicial es por convencion del programa el que corresponde al simbolo '&' (el simbolo NT inicial de la gramatica)
                                   in ND simb sts r stsa sti True -- finalmente construyo el automata
+
+
+-- >>> gramTermDerToAEFND (Gram [Rule Initial [RTNT (T {runT = "a"}) (NT "T")],Rule (NT "T") [RTNT (T {runT = "b"}) (NT "V"),RTNT (T {runT = "b"}) (NT "W")],Rule (NT "V") [RTNT (T {runT = "b"}) (NT "T")],Rule (NT "W") [RTNT (T {runT = "a"}) (NT "T"),RL]])
+-- ND [SimbND {runSimbND = "a"},SimbND {runSimbND = "b"},SimbND {runSimbND = ""}] [St {runSt = Nothing},St {runSt = Just "&"},St {runSt = Just "T"},St {runSt = Just "V"},St {runSt = Just "W"}] (RelT [(St {runSt = Just "&"},SimbND {runSimbND = "a"},St {runSt = Just "T"}),(St {runSt = Just "T"},SimbND {runSimbND = "b"},St {runSt = Just "V"}),(St {runSt = Just "T"},SimbND {runSimbND = "b"},St {runSt = Just "W"}),(St {runSt = Just "V"},SimbND {runSimbND = "b"},St {runSt = Just "T"}),(St {runSt = Just "W"},SimbND {runSimbND = "a"},St {runSt = Just "T"})]) [St {runSt = Nothing},St {runSt = Just "W"}] (St {runSt = Just "&"}) True
+
+-- >>> unificarRules [Rule Initial [RTNT (T {runT = "a"}) (NT "T")],Rule (NT "T") [RTNT (T {runT = "b"}) (NT "V"),RTNT (T {runT = "b"}) (NT "W")],Rule (NT "V") [RTNT (T {runT = "b"}) (NT "T")],Rule (NT "W") [RTNT (T {runT = "a"}) (NT "T"),RL]]
+--                   [Rule Initial [RTNT (T {runT = "a"}) (NT "T")],Rule (NT "T") [RTNT (T {runT = "b"}) (NT "V"),RTNT (T {runT = "b"}) (NT "W")],Rule (NT "V") [RTNT (T {runT = "b"}) (NT "T")],Rule (NT "W") [RTNT (T {runT = "a"}) (NT "T"),RL]]
+
+-- >>> isEstAcep (NT "W") [Rule Initial [RTNT (T {runT = "a"}) (NT "T")],Rule (NT "T") [RTNT (T {runT = "b"}) (NT "V"),RTNT (T {runT = "b"}) (NT "W")],Rule (NT "V") [RTNT (T {runT = "b"}) (NT "T")],Rule (NT "W") [RTNT (T {runT = "a"}) (NT "T"),RL]]
+-- True
+
+
 
 -- funcion que pasa un GramTerm correspondiente a una gramatica izquierda
 -- a un automata no determinista, esto lo logro
@@ -126,18 +139,27 @@ gramTermIzqToAEFND = flagToLeft . reverseAefnd . gramTermDerToAEFND
 -- una gram derecha a AEFND tambien devuelve Maybe entonces la gramatica izquierda
 -- termina siendo pasada a automata de estados Maybe Maybe mientras que la derecha simplemente Maybe
 -- (igual capaz esta funcion directamente vuela y termino usando las otras de forma directa depende como note que es mas comodo)
-gramToAEFND :: Gram -> Either (AEFND (Maybe (Maybe String))) (AEFND (Maybe String))
-gramToAEFND = either (Left . gramTermIzqToAEFND) (Right . gramTermDerToAEFND)
+-- gramToAEFND :: Gram -> Either (AEFND (Maybe (Maybe String))) (AEFND (Maybe String))
+-- gramToAEFND = either (Left . gramTermIzqToAEFND) (Right . gramTermDerToAEFND)
 
-gramIzqToAEFD :: GramTerm -> AEFD Int
-gramIzqToAEFD = undefined
+gramIzqToAEFDG :: GramTerm -> AEFDG
+gramIzqToAEFDG = aefdToAEFDG . aefndToAEFD . gramTermIzqToAEFND
 
-gramDerToAEFD :: GramTerm -> AEFD Int
-gramDerToAEFD = undefined
+gramDerToAEFDG :: GramTerm -> AEFDG
+gramDerToAEFDG = aefdToAEFDG . aefndToAEFD . gramTermDerToAEFND
 
-gramToAEFD :: Gram -> AEFD Int
-gramToAEFD = either gramIzqToAEFD gramDerToAEFD
+gramToAEFDG :: Gram -> AEFDG
+gramToAEFDG = either gramIzqToAEFDG gramDerToAEFDG
 
+funToRule :: (St a, SimbD, St a) -> Rule
+funToRule (s, t, s') = Rule Initial []
+
+funToRules :: [(St a, SimbD, St a)] -> [Rule]
+funToRules = map funToRule
+
+aefdToGram :: AEFD a -> Gram
+aefdToGram (D s sts (FunT f) stsa sti b) = let rus = funToRules f
+                                           in if b then Right $ Gram [] else Left $ Gram []
 
 -- RG ["a", "b", ""] ["A", "B", "&"] [RRNT "&" "a" "A", RRNT "&" "b" "B", RRL "&", RRNT "A" "b" "B", RRNT "A" "a" "&", RRT "B" "b"]
 -- Right (Gram [Rule Initial [RTNT (T \"a\") (NT \"A\"),RTNT (T \"b\") (NT \"B\"),RL],Rule (NT \"A\") [RTNT (T \"b\") (NT \"B\"),RTNT (T \"a\") Initial],Rule (NT \"B\") [RT (T \"b\")]])
@@ -152,6 +174,9 @@ gramToAEFD = either gramIzqToAEFD gramDerToAEFD
 -- >>> unificarRules' (Rule (NT "A") [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial]) ([Rule (NT "B") [RT (T {runT = "b"})],Rule (NT "A") [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial]])
 -- (Rule (NT "A") [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial],[Rule (NT "B") [RT (T {runT = "b"})]])
 
+
+-- >>> nub [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial, RTNT (T {runT = "a"}) Initial]
+-- [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial]
 
 -- >>> NT "A" == NT "A"
 -- True
