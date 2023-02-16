@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-noncanonical-monad-instances #-}
 module Eval
   ( evalOp )
 where
