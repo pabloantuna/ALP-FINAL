@@ -21,6 +21,7 @@ import           PPrint
 import           Parse
 import           Eval
 import           Grammar
+import           FiniteAutomata
 
 ---------------------
 --- Interpreter
@@ -72,6 +73,7 @@ readevalprint args state@(S inter env) =
         rec state { inter = True }
 
 data Command = Compile String String
+              | Print String
               | LPrint String
               | RPrint String
               | Browse
@@ -122,6 +124,9 @@ handleCommand state@(S inter env) cmd = case cmd of
       state' <- compileFile state f n
       return (Just state')
     else lift $ putStrLn "El archivo debe ser de extension .grm" >> return (Just state)
+  Print s ->
+    let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
+    in  return (Just state)
   LPrint s ->
     let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
     in  return (Just state)
@@ -138,6 +143,7 @@ commands :: [InteractiveCommand]
 commands =
   [ Cmd [":browse"] "" (const (const Browse)) "Ver los nombres en scope"
   , Cmd [":load"] "<name> <file>" Compile "Cargar una gramática desde un archivo y ponerle de nombre <name>"
+  , Cmd [":print"] "<gram>" (const Print) "Imprime una gramática (izquierda o derecha segun como haya sido generada)"
   , Cmd [":lprint"] "<gram>" (const LPrint) "Imprime una gramática como gramática izquierda"
   , Cmd [":rprint"] "<gram>" (const RPrint) "Imprime una gramática como gramática derecha"
   , Cmd [":quit"]       ""       (const (const Quit)) "Salir del intérprete"
@@ -176,7 +182,7 @@ compileFile state@(S inter v) f name = do
     )
   gram <- do g <- parseIO f' (gram_parse) x
              return (maybe Nothing (\x -> Just x) g)
-  lift $ putStrLn $ show $ pipo gram
+  -- lift $ putStrLn $ show $ pipo gram
   maybe (return state) (addGram state name) gram
 
 -- pipo :: Gram -> String
@@ -187,8 +193,10 @@ pipo gm = case gm of
 addGram :: State -> String -> Gram -> InputT IO State
 addGram state@(S inter env) name gram = 
   do 
-    let gram' = gramToAEFD gram
-     in return (S inter (replace name gram' env))
+    let gram' = gramToAEFDG gram
+        gram'' = either gramTermDerToAEFND gramTermDerToAEFND gram
+        gram''' = aefndToAEFD gram''
+     in lift (putStrLn (show gram''')) >> return (S inter (replace name gram' env))
 
 replace :: String -> AEFDG -> Env -> Env
 replace name gram [] = [(name, gram)]
