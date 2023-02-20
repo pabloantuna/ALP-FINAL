@@ -19,9 +19,10 @@ import           Text.PrettyPrint.HughesPJ      ( render
 import           Common
 import           PPrint
 import           Parse
-import           Eval
+import           Eval 
 import           Grammar
 import           FiniteAutomata
+
 
 ---------------------
 --- Interpreter
@@ -180,15 +181,8 @@ compileFile state@(S inter v) f name = do
               ("No se pudo abrir el archivo " ++ f' ++ ": " ++ err ++ "\n")
       return ""
     )
-  gram <- do g <- parseIO f' (gram_parse) x
-             return (maybe Nothing (\x -> Just x) g)
-  -- lift $ putStrLn $ show $ pipo gram
+  gram <- parseIO f' gram_parse x
   maybe (return state) (addGram state name) gram
-
--- pipo :: Gram -> String
-pipo gm = case gm of
-            Nothing -> "no amigo mal ahi"
-            Just x -> show x
 
 addGram :: State -> String -> Gram -> InputT IO State
 addGram state@(S inter env) name gram = 
@@ -216,13 +210,17 @@ parseIO f p x = lift $ case p x of
   Ok r -> return (Just r)
 
 handleStmt :: State -> Op -> InputT IO State
-handleStmt state stmt = lift $ do
+handleStmt state@(S inter env) stmt = lift $ do
   case stmt of
     OpDef n g -> addDef n g
     OpIn s g -> putStrLn "tuturu" >> return state
     OpEqual g1 g2 -> putStrLn "no hay tuturu" >> return state
  where
-  addDef name gram = return state
+  addDef name gram = let gram' = eval env gram
+                     in case gram' of
+                          Left x -> putStrLn x >> return state
+                          Right g -> return $ S inter (replace name g env)
+    
 
 it :: String
 it = "it"
