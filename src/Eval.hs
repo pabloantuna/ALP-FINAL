@@ -1,7 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-noncanonical-monad-instances #-}
 module Eval
-  ( evalOp )
+  ( evalOp, eval )
 where
 
 import Common
@@ -69,3 +69,8 @@ evalOp (OpReverse og) = do
 evalOp (OpSide og) = do
   og' <- evalOp og
   return $ sideAefd og'
+
+eval :: Env -> OpGram -> Either String AEFDG
+eval env og = case runStateError (evalOp og) env of
+  Right (g, _) -> Right g
+  Left x -> Left x
