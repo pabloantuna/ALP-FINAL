@@ -132,7 +132,7 @@ gramTermDerToAEFND (Gram rus) = let rules = unificarRules rus -- unifico las reg
 -- porque eso encontre en todos los foros (TODO: ver si hay otra forma)
 -- finalmente le marco el bool del AEFND en false para indicar que es izquierda para mas adelante
 gramTermIzqToAEFND :: GramTerm -> AEFND (Maybe (Maybe String))
-gramTermIzqToAEFND = flagToLeft . reverseAefnd . gramTermDerToAEFND
+gramTermIzqToAEFND = flagToLeft . reverseAEFND . gramTermDerToAEFND
 
 -- funcion que pasa de un Gram a un Either de AEFND de izq o der
 -- ya que como el reverse del automata devuelve estados Maybe pero el pasar
