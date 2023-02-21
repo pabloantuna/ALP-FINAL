@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use print" #-}
 module Main where
 
 import           Control.Exception              ( catch
@@ -213,14 +215,16 @@ handleStmt :: State -> Op -> InputT IO State
 handleStmt state@(S inter env) stmt = lift $ do
   case stmt of
     OpDef n g -> addDef n g
-    OpIn s g -> putStrLn "tuturu" >> return state
-    OpEqual g1 g2 -> putStrLn "no hay tuturu" >> return state
+    _ -> handleBool
  where
   addDef name gram = let gram' = eval env gram
                      in case gram' of
                           Left x -> putStrLn x >> return state
                           Right g -> return $ S inter (replace name g env)
-    
+  handleBool =  let gram' = evalQuery env stmt
+                in case gram' of
+                    Left x -> putStrLn x >> return state
+                    Right b -> putStrLn (show b) >> return state
 
 it :: String
 it = "it"
