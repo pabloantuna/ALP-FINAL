@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 module Common where
-  import Data.List.NonEmpty (NonEmpty)
+  -- import Data.List.NonEmpty (NonEmpty)
   -- import Control.Monad.State
   -- import qualified Data.Map.Strict as M
 
@@ -43,7 +43,7 @@ module Common where
     deriving (Eq, Ord, Show)
 
   -- simbolos automatas deterministas
-  newtype SimbD = SimbD {runSimbD :: NonEmpty Char} -- no puedo tener empty transition en un dfa (no puedo pasar al siguiente estado usando la cadena vacia)
+  newtype SimbD = SimbD {runSimbD :: String} -- a tener en cuenta: no puedo tener empty transition en un dfa (no puedo pasar al siguiente estado usando la cadena vacia)
     deriving (Eq, Ord, Show)
 
   -- estado

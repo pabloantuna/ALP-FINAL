@@ -5,7 +5,7 @@ import Common
 import Data.Set (fromList, fold, isSubsetOf, empty, intersection, Set)
 import qualified Data.Set as S (map, union)
 import Data.List (union, (\\), elemIndex, nub, intersect)
-import qualified Data.List.NonEmpty as NE (fromList, singleton, toList)
+-- import qualified Data.List.NonEmpty as NE (fromList, singleton, toList)
 import Data.Maybe (fromJust)
 
 
@@ -146,14 +146,14 @@ sideAEFD (D simb sts f stsa sti b) = D simb sts f stsa sti (not b)
 -- False -> el lenguaje no acepta la palabra dada desde el estado dado
 acceptFromSt :: Eq a => String -> AEFD a -> St a -> Bool
 acceptFromSt [] (D _ _ _ stsa _ _) st = st `elem` stsa -- cuando ya no tengo simbolos que consumir entonces me fijo si el estado en el cual estoy es de aceptacion, si es asi, la palabra es aceptada si no no
-acceptFromSt (x:xs) aefd@(D _ sts (FunT f) _ _ _) st = let st' = head [s | s <- sts, (st, SimbD $ NE.singleton x, s) `elem` f] -- lista de a lo sumo un solo elemento (debido al determinismo del automata) donde ese elemento es el siguiente estado al cual voy consumiendo el simbolo actual (Obs: esta lista nunca sera vacia porque ya se chequeo que todos los simbolos pertenezcan a mi alfabeto por lo cual siempre voy a algun estado aunque sea el estado basura)
+acceptFromSt (x:xs) aefd@(D _ sts (FunT f) _ _ _) st = let st' = head [s | s <- sts, (st, SimbD [x], s) `elem` f] -- lista de a lo sumo un solo elemento (debido al determinismo del automata) donde ese elemento es el siguiente estado al cual voy consumiendo el simbolo actual (Obs: esta lista nunca sera vacia porque ya se chequeo que todos los simbolos pertenezcan a mi alfabeto por lo cual siempre voy a algun estado aunque sea el estado basura)
                                                        in acceptFromSt xs aefd st' -- llamada recursiva con el resto de caracteres a consumir y el estado al cual debo ir ahora
 
 -- Funcion que dado un string y un conjunto de simbolos pertenecientes
 -- a un automata determinista determina si todos los simbolos de la string
 -- pertenecen al conjunto de simbolos del automata
 simbolosValidos :: String -> [SimbD] -> Bool
-simbolosValidos s simb = all (\c -> SimbD (NE.singleton c) `elem` simb) s
+simbolosValidos s simb = all (\c -> SimbD [c] `elem` simb) s
 
 -- funcion que dada una palabra y un automata
 -- determina si dicha palabra pertenece al lenguaje representado por el automata
@@ -275,7 +275,7 @@ allReach' st x sts r = fold S.union empty $ S.map reach st -- foldeo la union de
 -- luego hago uso de otra funcion auxiliar allReach'' la cual me va a devolver la funcion/relacion hibrida completa
 -- por ultimo la mapeo al tipo de funcion de transicion cambiando los simbolos 
 allReach :: (Ord a) => St (Set a) -> [SimbND] -> [St a] -> [(St a, SimbND, St a)] -> [(St (Set a), SimbD, St (Set a))]
-allReach sti simbs sts r = map (\(s, SimbND x, s') -> (s, SimbD $ NE.fromList x, s')) $ allReach'' simbs sts r f f -- usando la f descripta abajo hago uso de una funcion cuyo objetivo sera devolver la relacion en su totalidad tomando la relacion construida hasta ahora. Luego mapeo esa lista a la forma de funcion de transicion
+allReach sti simbs sts r = map (\(s, SimbND x, s') -> (s, SimbD x, s')) $ allReach'' simbs sts r f f -- usando la f descripta abajo hago uso de una funcion cuyo objetivo sera devolver la relacion en su totalidad tomando la relacion construida hasta ahora. Luego mapeo esa lista a la forma de funcion de transicion
                            where f = map (\s -> (sti, s, St $ allReach' (runSt sti) s sts r)) simbs -- mapeo sombre todos los simbolos una funcion para generar una transicion del estado inical pasado como arg hacia un conjunto de estados por cada simbolo (el conjunto de estados obtenido serían todos los estados del no determinista a los cuales llego con ese simbolo desde cada uno de los estados de mi conjunto de estados inicial en el no determinista, i.e me fijo en el no determinista tomando cada simbolo a que estados voy desde los estados que esten en el nuevo estado inicial del determinista)
 
 -- funcion que dado un automata no determinista construye un
@@ -290,7 +290,7 @@ allReach sti simbs sts r = map (\(s, SimbND x, s') -> (s, SimbD $ NE.fromList x,
 -- este estado original en el no determinista a traves de lambda transitions
 aefndToAEFD :: (Ord a) => AEFND a -> AEFD (Set a)
 aefndToAEFD (ND simb sts (RelT r) stsa sti b) =
-  let simb' = map (\(SimbND x) -> SimbD $ NE.fromList x) (simb \\ [SimbND ""]) -- mi alfabato es el mismo menos la vacia, el lambda, el ""
+  let simb' = map (\(SimbND x) -> SimbD x) (simb \\ [SimbND ""]) -- mi alfabato es el mismo menos la vacia, el lambda, el ""
       sti' = St $ fromList $ union [runSt sti] [runSt s | s <- lambdaReach sti sts r] -- el estado inicial nuevo es el estado inicial + los estados a los cuales puedo llegar desde el inicial a traves de lambda/empty transitions
       f = allReach sti' (simb \\ [SimbND ""]) sts r -- obtengo la funcion de transicion 
       sts' = nub $ map (\(s, _, _) -> s) f ++ map (\(_, _, s') -> s') f -- obtengo los estados a partir de la funcion de transición y elimino repetidos (esto creo que de alguna forma podria hacerlo al mismo tiempo que calculo las funciones pero se me esta rompiendo la cabeza a esta altura)
@@ -337,6 +337,6 @@ concatAEFND (ND simb sts (RelT r) stsa sti b) (ND simb' sts' (RelT r') stsa' sti
 
 
 aefdToAEFND :: AEFD a -> AEFND a
-aefdToAEFND (D simb sts (FunT f) stsa sti b) = let simb' = map (\(SimbD x) -> SimbND $ NE.toList x) simb
-                                                   r = map (\(st, SimbD x, st') -> (st, SimbND $ NE.toList x, st')) f
+aefdToAEFND (D simb sts (FunT f) stsa sti b) = let simb' = map (\(SimbD x) -> SimbND x) simb
+                                                   r = map (\(st, SimbD x, st') -> (st, SimbND x, st')) f
                                                in ND simb' sts (RelT r) stsa sti b
