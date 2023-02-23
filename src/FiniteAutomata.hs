@@ -162,27 +162,34 @@ simbolosValidos s simb = all (\c -> SimbD [c] `elem` simb) s
 inAEFD :: String -> AEFDG -> Bool
 inAEFD w aefd@(D simb _ _ _ sti _) = simbolosValidos w simb && acceptFromSt w aefd sti
 
+-- 
 equalAEFD :: AEFDG -> AEFDG -> Bool
-equalAEFD = undefined
+equalAEFD aefd aefd' = let aefdm = minimizeAEFD aefd
+                           aefdm' = minimizeAEFD aefd'
+                           p = intersecAEFD (complementAEFD aefdm) aefdm'
+                           s = intersecAEFD aefdm (complementAEFD aefdm')
+                       in emptyLan p && emptyLan s
 
 ---------
 -- Minimizar automata determinista
 ---------
 
-removeUnreachable :: Eq a => AEFD a -> AEFD a
-removeUnreachable aefd@(D simb sts (FunT f) stsa sti b) = let sts' = reachableStates aefd [sti]
-                                                              f' = filter (\(st, _, st') -> st `elem` sts' && st' `elem` sts') f
-                                                              stsa' = intersect stsa sts'
-                                                          in D simb sts' (FunT f') stsa' sti b
+-- 
+removeUnreachable :: Ord a => AEFD a -> AEFD a
+removeUnreachable aefd@(D simbs _ (FunT f) stsa sti b) = let sts' = reachableStates aefd [sti]
+                                                             f' = filter (\(st, _, st') -> st `elem` sts' && st' `elem` sts') f
+                                                             stsa' = intersect stsa sts'
+                                                        in D simbs sts' (FunT f') stsa' sti b
 
-reachableStates :: AEFD a -> [St a] -> [St a]
-reachableStates aefd@(D simb sts (FunT f) stsa sti b) rsts = undefined
-  -- let newSts = 
-      
-  -- in if algo then rsts else reachableStates aefd 
+--
+reachableStates :: (Ord a) =>AEFD a -> [St a] -> [St a]
+reachableStates aefd@(D _ _ (FunT f) _ _ _) rsi = 
+  let stsNow = [st' | (st, _, st') <- f, st `elem` rsi, st /= st']
+  in (if isSubsetOf (fromList stsNow) (fromList rsi) then rsi else reachableStates aefd (nub $ stsNow ++ rsi))
 
-minimizeAEFD :: AEFD a -> AEFD a
-minimizeAEFD = id
+-- 
+minimizeAEFD :: Ord a => AEFD a -> AEFD a
+minimizeAEFD = removeUnreachable
 
 ---------
 -- Utilidad varios
@@ -335,11 +342,26 @@ concatAEFND (ND simb sts (RelT r) stsa sti b) (ND simb' sts' (RelT r') stsa' sti
       sti'' = stateRenameP sti -- mi nuevo estado inicial es el estado inicial del primer automata renombrado
   in ND (simb `union` simb') sts'' (RelT r'') stsa'' sti'' (b && b')
 
-
+-- 
 aefdToAEFND :: AEFD a -> AEFND a
 aefdToAEFND (D simb sts (FunT f) stsa sti b) = let simb' = map (\(SimbD x) -> SimbND x) simb
                                                    r = map (\(st, SimbD x, st') -> (st, SimbND x, st')) f
                                                in ND simb' sts (RelT r) stsa sti b
 
-removeDeadStates :: AEFD a -> AEFD a
-removeDeadStates a@(D simb sts (FunT f) stsa sti b) = a
+-- funcion que dado un automata determinista
+-- devuelve otro que no tiene estados 'muertos' o 'basura' (ni las transiciones relacionadas a ellos)
+-- i.e no tiene estados a los que se pueda llegar y no salir (que no sean de aceptacion)
+-- si bien devuelve un automata determinista, al no tener este tipo de estados
+-- no es un automata completo y solo lo usaremos para el pasaje a gramatica
+-- ya que estos estados (con sus respectivas transiciones) pasados a gramatica
+-- no aportan ninguna informacion util ya que solo haria que se pueda infinitamente poner simbolos
+-- que nunca llegarian a ningun lado (a ninguna regla de produccion que pueda terminar de producir) 
+removeDeadStates :: Eq a => AEFD a -> AEFD a
+removeDeadStates (D simb sts (FunT f) stsa sti b) = let sts' = nub $ filter canContinue sts ++ stsa
+                                                        canContinue s = not $ null (nub ([s' | (ss, _, s') <- f, s == ss]) \\ [s])
+                                                        f' = filter (\(s, _, s') -> s `elem` sts' && s' `elem` sts') f
+                                                    in D simb sts' (FunT f') stsa sti b
+
+-- 
+emptyLan :: Ord a => AEFD a -> Bool
+emptyLan aefd@(D _ _ _ stsa sti _) = let rs = reachableStates aefd [sti] in rs \\ stsa == rs
