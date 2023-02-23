@@ -120,7 +120,7 @@ complementAEFD (D simb sts (FunT f) stsa sti b) = let stsa' = [st | st <- sts, s
 -- utilizamos luego la funcion de reverseAEFND que ya hicimos 
 -- anteriormente. Luego lo volvemos a pasar a AEFD
 -- y por ultimo estandarizamos a AEFDG
-reverseAEFD :: AEFDG -> AEFDG
+reverseAEFD :: Ord a => AEFD a -> AEFDG
 reverseAEFD = aefdToAEFDG . aefndToAEFD . reverseAEFND . aefdToAEFND
 
 -- funcion que toma un automata y devuelve el mismo pero
@@ -182,7 +182,7 @@ reachableStates aefd@(D simb sts (FunT f) stsa sti b) rsts = undefined
   -- in if algo then rsts else reachableStates aefd 
 
 minimizeAEFD :: AEFD a -> AEFD a
-minimizeAEFD = undefined
+minimizeAEFD = id
 
 ---------
 -- Utilidad varios
@@ -340,3 +340,6 @@ aefdToAEFND :: AEFD a -> AEFND a
 aefdToAEFND (D simb sts (FunT f) stsa sti b) = let simb' = map (\(SimbD x) -> SimbND x) simb
                                                    r = map (\(st, SimbD x, st') -> (st, SimbND x, st')) f
                                                in ND simb' sts (RelT r) stsa sti b
+
+removeDeadStates :: AEFD a -> AEFD a
+removeDeadStates a@(D simb sts (FunT f) stsa sti b) = a

@@ -151,15 +151,33 @@ gramDerToAEFDG = aefdToAEFDG . aefndToAEFD . gramTermDerToAEFND
 gramToAEFDG :: Gram -> AEFDG
 gramToAEFDG = either gramIzqToAEFDG gramDerToAEFDG
 
-funToRule :: (St a, SimbD, St a) -> Rule
-funToRule (s, t, s') = Rule Initial []
+funToRule :: (Eq a, Show a) => St a -> (St a, SimbD, St a) -> Rule
+funToRule sti (s, t, s') | s == sti = Rule Initial [RTNT (T $ runSimbD t) (NT $ show $ runSt s')]
+                         | otherwise = Rule (NT $ show $ runSt s) [RTNT (T $ runSimbD t) (if sti == s' then NT "&" else NT $ show $ runSt s')]
 
-funToRules :: [(St a, SimbD, St a)] -> [Rule]
-funToRules = map funToRule
+funToRules :: (Eq a, Show a) => [(St a, SimbD, St a)] -> St a -> [Rule]
+funToRules r sti = map (funToRule sti) r
 
-aefdToGram :: AEFD a -> Gram
-aefdToGram (D s sts (FunT f) stsa sti b) = let rus = funToRules f
-                                           in if b then Right $ Gram [] else Left $ Gram []
+staToFinishRule :: (Eq a, Show a) => St a -> St a -> Rule
+staToFinishRule sti st | st == sti = Rule Initial [RL]
+                       | otherwise = Rule (NT $ show $ runSt st) [RL]
+
+stsaToFinishRules :: (Eq a, Show a) => St a -> [St a] -> [Rule]
+stsaToFinishRules sti = map (staToFinishRule sti)
+
+aefdToGramDer :: (Eq a, Show a) => AEFD a -> Gram
+aefdToGramDer aefd = let (D s sts (FunT f) stsa sti _) = removeDeadStates $ minimizeAEFD aefd
+                         rus = unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
+                     in Right $ Gram rus
+
+aefdToGramIzq :: (Ord a) => AEFD a -> Gram
+aefdToGramIzq aefd = let (D s sts (FunT f) stsa sti _) = removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
+                         rus = unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
+                     in Left $ Gram rus
+
+aefdToGram :: (Show a, Ord a) => AEFD a -> Gram
+aefdToGram aefd@(D _ _ _ _ _ b) = if b then aefdToGramDer aefd else aefdToGramIzq aefd
+
 
 -- RG ["a", "b", ""] ["A", "B", "&"] [RRNT "&" "a" "A", RRNT "&" "b" "B", RRL "&", RRNT "A" "b" "B", RRNT "A" "a" "&", RRT "B" "b"]
 -- Right (Gram [Rule Initial [RTNT (T \"a\") (NT \"A\"),RTNT (T \"b\") (NT \"B\"),RL],Rule (NT \"A\") [RTNT (T \"b\") (NT \"B\"),RTNT (T \"a\") Initial],Rule (NT \"B\") [RT (T \"b\")]])

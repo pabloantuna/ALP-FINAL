@@ -14,12 +14,9 @@ import           System.Console.Haskeline
 import qualified Control.Monad.Catch           as MC
 import           System.Environment
 import           System.IO               hiding ( print )
-import           Text.PrettyPrint.HughesPJ      ( render
-                                                , text
-                                                )
 
 import           Common
-import           PPrint
+import           PPrint ( printGram, render )
 import           Parse
 import           Eval 
 import           Grammar
@@ -128,14 +125,20 @@ handleCommand state@(S inter env) cmd = case cmd of
       return (Just state')
     else lift $ putStrLn "El archivo debe ser de extension .grm" >> return (Just state)
   Print s ->
-    let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
-    in  return (Just state)
+    let g = findGram env s
+    in case g of
+      Nothing -> lift $ putStrLn ("No se ha encontrado la gramatica buscada: " ++ show s) >> return (Just state)
+      Just ae -> printGrammar ae >> return (Just state)
   LPrint s ->
-    let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
-    in  return (Just state)
+    let g = findGram env s
+    in case g of
+      Nothing -> lift $ putStrLn "No se ha encontrado la gramatica buscada_:" >> return (Just state)
+      Just ae -> printGrammarL ae >> return (Just state)
   RPrint s ->
-    let s' = reverse (dropWhile isSpace (reverse (dropWhile isSpace s)))
-    in  return (Just state)
+    let g = findGram env s
+    in case g of
+      Nothing -> lift $ putStrLn "No se ha encontrado la gramatica buscada-:" >> return (Just state)
+      Just ae -> printGrammarR ae >> return (Just state)
   Interactive s -> do
     state' <- compilePhrase state s
     return $ Just state'
@@ -146,9 +149,9 @@ commands :: [InteractiveCommand]
 commands =
   [ Cmd [":browse"] "" (const (const Browse)) "Ver los nombres en scope"
   , Cmd [":load"] "<name> <file>" Compile "Cargar una gramática desde un archivo y ponerle de nombre <name>"
-  , Cmd [":print"] "<gram>" (const Print) "Imprime una gramática (izquierda o derecha segun como haya sido generada)"
-  , Cmd [":lprint"] "<gram>" (const LPrint) "Imprime una gramática como gramática izquierda"
-  , Cmd [":rprint"] "<gram>" (const RPrint) "Imprime una gramática como gramática derecha"
+  , Cmd [":print"] "<gram>" (const . Print) "Imprime una gramática (izquierda o derecha segun como haya sido generada)"
+  , Cmd [":lprint"] "<gram>" (const . LPrint) "Imprime una gramática como gramática izquierda"
+  , Cmd [":rprint"] "<gram>" (const . RPrint) "Imprime una gramática como gramática derecha"
   , Cmd [":quit"]       ""       (const (const Quit)) "Salir del intérprete"
   , Cmd [":help", ":?"] ""       (const (const Help)) "Mostrar esta lista de comandos"
   ]
@@ -229,4 +232,22 @@ handleStmt state@(S inter env) stmt = lift $ do
 it :: String
 it = "it"
 
+findGram :: Env -> Name -> Maybe AEFDG
+findGram [] _ = Nothing
+findGram ((gname, g):gs) name | name == gname = Just g
+                              | otherwise = findGram gs name
 
+printGrammar :: AEFDG -> InputT IO ()
+printGrammar ae = lift $ do
+  let outtext = printGram $ aefdToGram ae
+  putStrLn $ render outtext
+
+printGrammarL :: AEFDG -> InputT IO ()
+printGrammarL ae = lift $ do
+  let outtext = printGram $ aefdToGramIzq ae
+  putStrLn $ render outtext
+
+printGrammarR :: AEFDG -> InputT IO ()
+printGrammarR ae = lift $ do
+  let outtext = printGram $ aefdToGramDer ae
+  putStrLn $ render outtext
