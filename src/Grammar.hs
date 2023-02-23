@@ -165,17 +165,17 @@ staToFinishRule sti st | st == sti = Rule Initial [RL]
 stsaToFinishRules :: (Eq a, Show a) => St a -> [St a] -> [Rule]
 stsaToFinishRules sti = map (staToFinishRule sti)
 
-aefdToGramDer :: (Eq a, Show a) => AEFD a -> Gram
-aefdToGramDer aefd = let (D s sts (FunT f) stsa sti _) = removeDeadStates $ minimizeAEFD aefd
+aefdToGramDer :: (Ord a) => AEFD a -> Gram
+aefdToGramDer aefd = let (D _ _ (FunT f) stsa sti _) = aefdToAEFDG $ removeDeadStates $ minimizeAEFD aefd
                          rus = unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
                      in Right $ Gram rus
 
 aefdToGramIzq :: (Ord a) => AEFD a -> Gram
-aefdToGramIzq aefd = let (D s sts (FunT f) stsa sti _) = removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
+aefdToGramIzq aefd = let (D _ _ (FunT f) stsa sti _) = aefdToAEFDG $ removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
                          rus = unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
                      in Left $ Gram rus
 
-aefdToGram :: (Show a, Ord a) => AEFD a -> Gram
+aefdToGram :: (Ord a) =>AEFD a -> Gram
 aefdToGram aefd@(D _ _ _ _ _ b) = if b then aefdToGramDer aefd else aefdToGramIzq aefd
 
 

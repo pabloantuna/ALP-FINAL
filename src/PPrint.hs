@@ -12,19 +12,15 @@ import Data.Text ( unpack )
 import Prettyprinter.Render.Terminal
   ( renderStrict, italicized, color, colorDull, Color (..), AnsiStyle )
 import Prettyprinter
-    ( (<+>),
-      annotate,
+    ( annotate,
       defaultLayoutOptions,
       layoutSmart,
-      nest,
       sep,
-      parens,
+      vsep,
       pipe,
       dquotes,
       Doc,
       Pretty(pretty) )
-import Data.List (delete, groupBy)
-import Data.Function (on)
 
 --Colores
 nonTerminalColor :: Doc AnsiStyle -> Doc AnsiStyle
@@ -35,13 +31,6 @@ bnfColor :: Doc AnsiStyle -> Doc AnsiStyle
 bnfColor = annotate (colorDull Cyan) -- <> bold)
 terminalColor :: Doc AnsiStyle -> Doc AnsiStyle
 terminalColor = annotate (color Green)
-nameColor :: Doc AnsiStyle -> Doc AnsiStyle
-nameColor = id
-
-
--- | Pretty printer de nombres (Doc)
-name2doc :: Name -> Doc AnsiStyle
-name2doc n = nameColor (pretty n)
 
 nt2doc :: NT -> Doc AnsiStyle
 nt2doc Initial = nonTerminalColor (pretty "&")
@@ -49,17 +38,6 @@ nt2doc (NT nt) = nonTerminalColor (pretty nt)
 
 t2doc :: T -> Doc AnsiStyle
 t2doc t = dquotes $ terminalColor (pretty $ runT t)
-
--- |  Pretty printer de nombres (String)
-ppName :: Name -> String
-ppName = id
-
--- parensIf :: Bool -> Doc AnsiStyle -> Doc AnsiStyle
--- parensIf True  = parens
--- parensIf _ = id
-
--- printGramTerm :: GramTerm -> Doc AnsiStyle
--- printGramTerm t = pp 0 (filter (\v -> v `notElem` (fv t)) vars) t
 
 printRightSideLeft :: RigthSide -> Doc AnsiStyle
 printRightSideLeft (RT t) = t2doc t
@@ -88,10 +66,10 @@ printRuleRight :: Rule -> Doc AnsiStyle
 printRuleRight (Rule nt rss) = sep $ nt2doc nt:(arrowColor (pretty "->"):printRightSidesRight rss)
 
 printRulesLeft :: [Rule] -> Doc AnsiStyle
-printRulesLeft rs = sep $ map printRuleLeft rs
+printRulesLeft rs = vsep $ map printRuleLeft rs
 
 printRulesRight :: [Rule] -> Doc AnsiStyle
-printRulesRight rs = sep $ map printRuleRight rs
+printRulesRight rs = vsep $ map printRuleRight rs
 
 printGramLeft :: GramTerm -> Doc AnsiStyle
 printGramLeft (Gram rus) = printRulesLeft rus
