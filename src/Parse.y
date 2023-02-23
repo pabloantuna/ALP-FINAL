@@ -131,26 +131,26 @@ happyError :: P a
 happyError = \ s i -> Failed $ "Línea "++(show (i::LineNumber))++": Error de parseo\n"++(s)
 
 data Token = TInit
-               | TArrow
-               | TDef
-               | TOr
-               | TLambda
-               | TEnd
-               | TIn
-               | TEqual
-               | TUnion
-               | TIntersec
-               | TDiff
-               | TConcat
-               | TComplement
-               | TReverse
-               | TSide
-               | TT String
-               | TNT String
-               | TOpen
-               | TClose
-               | TEOF
-               deriving Show
+           | TArrow
+           | TDef
+           | TOr
+           | TLambda
+           | TEnd
+           | TIn
+           | TEqual
+           | TUnion
+           | TIntersec
+           | TDiff
+           | TConcat
+           | TComplement
+           | TReverse
+           | TSide
+           | TT String
+           | TNT String
+           | TOpen
+           | TClose
+           | TEOF
+  deriving Show
 
 --------------------------------------------------------------------
 --- El laboratorio de Lexer 
@@ -166,20 +166,20 @@ lexer cont s = case s of
                     ('-':('-':cs)) -> lexer cont $ dropWhile ((/=) '\n') cs
                     ('{':('-':cs)) -> consumirBK 0 0 cont cs	
                     ('-':('}':cs)) -> \ line -> Failed $ "Línea "++(show line)++": Comentario no abierto"
-                    ('&':cs) -> cont TInit cs
                     ('-':('>':cs)) -> cont TArrow cs
+                    ('=':('=':cs)) -> cont TEqual cs
+                    ('+':('+':cs)) -> cont TConcat cs
+                    ('~':('~':cs)) -> cont TReverse cs
+                    ('&':cs) -> cont TInit cs
                     ('=':cs) -> cont TDef cs
                     ('|':cs) -> cont TOr cs
                     ('\\':cs)-> cont TLambda cs
                     (';':cs) -> cont TEnd cs
                     ('?':cs) -> cont TIn cs
-                    ('=':('=':cs)) -> cont TEqual cs
                     ('+':cs) -> cont TUnion cs
                     ('.':cs) -> cont TIntersec cs
                     ('-':cs) -> cont TDiff cs
-                    ('+':('+':cs)) -> cont TConcat cs
                     ('~':cs) -> cont TComplement cs
-                    ('~':('~':cs)) -> cont TReverse cs
                     ('!':cs) -> cont TSide cs
                     ('"':cs) -> lexT cs
                     ('(':cs) -> cont TOpen cs
