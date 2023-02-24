@@ -5,7 +5,6 @@ import Common
 import Data.Set (fromList, fold, isSubsetOf, empty, intersection, Set)
 import qualified Data.Set as S (map, union)
 import Data.List (union, (\\), elemIndex, nub, intersect)
--- import qualified Data.List.NonEmpty as NE (fromList, singleton, toList)
 import Data.Maybe (fromJust)
 
 
@@ -133,7 +132,7 @@ reverseAEFD = aefdToAEFDG . aefndToAEFD . reverseAEFND . aefdToAEFND
 -- imprimir a derecha o a izquierda y de esta forma esto tiene un uso
 -- que es: se va a mostrar la gramatica segun si el booleano indica derecha o izquierda
 sideAEFD :: AEFDG -> AEFDG
-sideAEFD (D simb sts f stsa sti b) = D simb sts f stsa sti (not b)
+sideAEFD (D simb sts f stsa sti b) = D simb sts f stsa sti (not b) -- cambio el bool que indica si era izq o der
 
 ----------
 -- Las operaciones booleanas
@@ -153,46 +152,62 @@ acceptFromSt (x:xs) aefd@(D _ sts (FunT f) _ _ _) st = let st' = head [s | s <- 
 -- a un automata determinista determina si todos los simbolos de la string
 -- pertenecen al conjunto de simbolos del automata
 simbolosValidos :: String -> [SimbD] -> Bool
-simbolosValidos s simb = all (\c -> SimbD [c] `elem` simb) s
+simbolosValidos s simb = all (\c -> SimbD [c] `elem` simb) s -- todos los simbolos de la palabra estan en mi alfabeto
 
 -- funcion que dada una palabra y un automata
 -- determina si dicha palabra pertenece al lenguaje representado por el automata
 -- obs: palabra en el sentido de palabra de un lenguaje, por ejemplo si el lenguaje acepta el caracter ' ' (espacio) entonces
 -- "hola mundo" cuenta como una palabra y no dos
 inAEFD :: String -> AEFDG -> Bool
-inAEFD w aefd@(D simb _ _ _ sti _) = simbolosValidos w simb && acceptFromSt w aefd sti
+inAEFD w aefd@(D simb _ _ _ sti _) = simbolosValidos w simb && acceptFromSt w aefd sti -- si los simbolos son validos y la palabra es aceptada en el automata desde el estado de inicio
 
--- 
+-- funcion que dado dos automatas deterministas que representan una gramatica
+-- devuelve un Bool indicando si son gramaticas equivalentes (True) o no (False)
+-- para esto primero unificamos los alfabetos
+-- minimizamos los automatas para optimizar la intersección siguiente
+-- luego realizamos las intersecciones del complemento del primero (minimizado) con el segundo (minimizado)
+-- y viceversa
+-- por ultimo chequeamos que ambos resultados acepten el lenguaje vacio
+-- esto seria equivalente a chequear que al restar las palabras de uno o del otro el resultado sea que no puedo aceptar ninguna palabra
+-- i.e aceptan solo las mismas palabras => son equivalentes
 equalAEFD :: AEFDG -> AEFDG -> Bool
-equalAEFD aefd aefd' = let (aefdn, aefdn') = sameSimbs aefd aefd'
-                           aefdm = minimizeAEFD aefdn
-                           aefdm' = minimizeAEFD aefdn'
-                           p = intersecAEFD' (complementAEFD aefdm) aefdm'
-                           s = intersecAEFD' aefdm (complementAEFD aefdm')
-                       in emptyLan p && emptyLan s
+equalAEFD aefd aefd' = let (aefdn, aefdn') = sameSimbs aefd aefd' -- igualo simbolos
+                           aefdm = minimizeAEFD aefdn -- minimizo el primero
+                           aefdm' = minimizeAEFD aefdn' -- minimizo el segundo
+                           p = intersecAEFD' (complementAEFD aefdm) aefdm' -- interseccion del complemento del primero con el segundo
+                           s = intersecAEFD' aefdm (complementAEFD aefdm') -- interseccion del primero con el complemento del segundo
+                       in emptyLan p && emptyLan s -- chequeo aceptacion del lenguaje vacio en ambos resultados
 
 ---------
 -- Minimizar automata determinista
 ---------
 
--- 
+-- funcion que dado un automata determinista
+-- devuelve otro que no presenta estados inalcanzables
 removeUnreachable :: Ord a => AEFD a -> AEFD a
-removeUnreachable aefd@(D simbs _ (FunT f) stsa sti b) = let sts' = reachableStates aefd [sti]
-                                                             f' = filter (\(st, _, st') -> st `elem` sts' && st' `elem` sts') f
-                                                             stsa' = intersect stsa sts'
+removeUnreachable aefd@(D simbs _ (FunT f) stsa sti b) = let sts' = reachableStates aefd [sti] -- obtengo los estados alcanzables a partir del estado inicial
+                                                             f' = filter (\(st, _, st') -> st `elem` sts' && st' `elem` sts') f -- mi nuevo f son los que tengan a los estados alcanzables
+                                                             stsa' = intersect stsa sts' -- los estados de aceptacion son los que antes eran de aceptacion pero que esten en mi lista de estados nueva
                                                         in D simbs sts' (FunT f') stsa' sti b
 
---
+-- Función que toma un automata determinista
+-- y un conjunto de estados
+-- y devuelve el conjunto de estados al cual se puede llegar
+-- desde los estados dados
 reachableStates :: (Ord a) => AEFD a -> [St a] -> [St a]
-reachableStates aefd@(D _ _ (FunT f) _ _ _) rsi = 
-  let stsNow = [st' | (st, _, st') <- f, st `elem` rsi, st /= st']
-  in (if isSubsetOf (fromList stsNow) (fromList rsi) then rsi else reachableStates aefd (nub $ stsNow ++ rsi))
+reachableStates aefd@(D _ _ (FunT f) _ _ _) rsi =
+  let stsNow = [st' | (st, _, st') <- f, st `elem` rsi, st /= st'] -- calcula los estados alcanzables en esta iteración
+  in (if isSubsetOf (fromList stsNow) (fromList rsi) then rsi else reachableStates aefd (nub $ stsNow ++ rsi)) -- si los estados alcanzables en esta iteracion estan contenidos en los estados que ya tengo guardados entonces ya terminé y devuelvo mis estados hasta el momento. Si no en la llamada recursiva para la proxima iteracion incluyo los estados de esta iteracion a los estados que ya tengo
 
 
---
+-- funcion que dado el conjunto de simbolos del automata determinista
+-- las transiciones del mismo
+-- el conjunto de estados originales
+-- y una partición (la última particion conseguida en el proceso)
+-- calcula la nueva partición
 partition :: Eq a => [SimbD] -> [(St a, SimbD, St a)] -> [St a] -> [[St a]] -> [[St a]]
 partition simbs f sts pLast = concatMap (partition' []) pLast
-  where 
+  where
     -- funcion que calcula un nuevo conjunto de partición en base
     -- a la particion anterior
     partition' n [] = n
@@ -201,7 +216,7 @@ partition simbs f sts pLast = concatMap (partition' []) pLast
     -- funcion auxiliar para determinar si dos estados son distinguibles
     -- esto lo logramos haciendo uso de otra funcion que nos va a devolver el indice k de a que P_k pertenece el estado
     -- y viendo que ambos estados tengan un k distinto
-    distinguishable st st' = 
+    distinguishable st st' =
       any (\x -> kPart (head [s | s <- sts, (st, x, s) `elem` f]) pLast 0 /= kPart (head [s | s <- sts, (st', x, s) `elem` f]) pLast 0) simbs -- `Two states ( qi, qj ) are distinguishable in partition Pk if for any input symbol a, δ ( qi, a ) and δ ( qj, a ) are in different sets in partition Pk-1`. O sea que busco a que numero de particion pertenece el estado al cual puedo ir desde estos estados con el mismo simbolo y si son distintos (aunque sea para un simbolo) entonces son distinguishables
     -- funcion que toma un estado, una particion y un numero que será el indice que ira acumulando
     -- y devuelve el indice del conjunto de la particion al cual pertenece el estado
@@ -220,12 +235,13 @@ minimizeStates simbs f sts part = let partK = partition simbs f sts part -- part
 -- funcion que dado un automata determinista
 -- devuelve un automata sin los estados no distinguibles
 removeNonDistinguishable :: (Ord a) => AEFD a -> AEFD [a]
-removeNonDistinguishable (D simb sts (FunT f) stsa sti b) = 
+removeNonDistinguishable (D simb sts (FunT f) stsa sti b) =
   let p0 = [stsa, sts \\ stsa] -- la primer particion es los estados de aceptacion y los estados que no son de aceptacion
       sts' = minimizeStates simb f sts p0 -- obtengo la minima cantidad de estados usando el algoritmo de particionado (que en algun lado creo que lei que es Moore pero nadie lo explica muy bien asi que no se)
-      f' = [] -- completar
-      stsa' = [s | s <- sts', intersection (fromList $ runSt s) (fromList (map runSt stsa)) /= empty]
-      sti' = head [s | s <- sts', runSt sti `elem` runSt s]
+      f' = [(st, x, st') | st<-sts', x<-simb, st'<-sts', existTransition st x st'] -- mi nueva funcion de transicion van a ser los estados nuevos con el simbolo correspondiente si es que existia en el automata originar una transicion usando ese simbolo desde al menos un estado del conjunto de estas st al conjunto de estados st' (i.e (st, x, st') es una transicion si existe una transicion en el automata original que vaya de algun estado de st a algun estado de st' a traves de x )
+      existTransition st x st' = or $ concatMap (\s -> map (\s' -> (St s, x, St s') `elem` f) (runSt st') ) (runSt st) -- esta es la funcion que me dice si efectivamente existe algun estado de st que vaya a algun estado de st' a traves de x. Esto lo busco mapeando sobre los estados de st (primer conjunto de estados) una funcion que mapea sobre st' (segundo conjunto de estados) y se fija si existe la transicion original de cada estado de st a cada estado de st' a traves de x, si al menos una existe entonces tengo que considerar que existe una nueva relacion para mi nuevo automata que va de st a st' usando x
+      stsa' = [s | s <- sts', intersection (fromList $ runSt s) (fromList (map runSt stsa)) /= empty] -- siguiendo la idea de la formula usada para pasar de aefnd a aefd encuentro los nuevos estados de transicion (la interseccion entre los estados dentro de mi conjunto de estados (que ahora es un estado) con los estados de aceptacion no debe ser vacia, i.e en mi conjunto de estados tiene que haber al menos un estado de aceptacion para que este conjunto sea estado de aceptacion)
+      sti' = head [s | s <- sts', runSt sti `elem` runSt s] -- busco el conjunto de estados que tiene al estado inicial en el y ese sera mi nuevo estado inicial
   in D simb sts' (FunT f') stsa' sti' b
 
 -- >>> minimizeStates [SimbD {runSimbD = "a"},SimbD {runSimbD = "b"}] [(St {runSt = 0},SimbD {runSimbD = "a"},St {runSt = 4}),(St {runSt = 0},SimbD {runSimbD = "b"},St {runSt = 1}),(St {runSt = 1},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 1},SimbD {runSimbD = "b"},St {runSt = 3}),(St {runSt = 2},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 2},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 4},SimbD {runSimbD = "a"},St {runSt = 0}),(St {runSt = 4},SimbD {runSimbD = "b"},St {runSt = 1})] [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] [[St {runSt = 0},St {runSt = 3}], [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] \\ [St {runSt = 0},St {runSt = 3}]]
@@ -235,7 +251,11 @@ removeNonDistinguishable (D simb sts (FunT f) stsa sti b) =
 -- [[St {runSt = 3},St {runSt = 0}],[St {runSt = 1}],[St {runSt = 2}],[St {runSt = 4}]]
 
 
--- 
+-- funcion que toma un automata determinista
+-- y devuelve otro minimizado donde sus estados pasan de ser de tipo a a tipo [a]
+-- por el proceso de remove/merge non-distinguishable que usa las particiones
+-- y termina devolviendo conjuntos de estados como nuevos estados
+-- (tambien podria ser un Set como hice antes para pasar de AEFDN a AEFD)
 minimizeAEFD :: Ord a => AEFD a -> AEFD [a]
 minimizeAEFD = removeNonDistinguishable . removeUnreachable
 
@@ -410,6 +430,8 @@ removeDeadStates (D simb sts (FunT f) stsa sti b) = let sts' = nub $ filter canC
                                                         f' = filter (\(s, _, s') -> s `elem` sts' && s' `elem` sts') f
                                                     in D simb sts' (FunT f') stsa sti b
 
--- 
+-- funcion que dado un automata nos devuelve
+-- true si acepta el lenguaje vacio (o sea que se queda "encerrado" y nunca llega a un estado de aceptacion)
+-- false si no acepta (llega a un estado de aceptacion)
 emptyLan :: Ord a => AEFD a -> Bool
 emptyLan aefd@(D _ _ _ stsa sti _) = let rs = reachableStates aefd [sti] in rs \\ stsa == rs
