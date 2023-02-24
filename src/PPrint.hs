@@ -5,6 +5,7 @@ module PPrint (
 where
 
 import           Common
+import           Grammar
 -- import           Text.PrettyPrint.HughesPJ
 -- import           Prelude                 hiding ( (<>) )
 
@@ -19,8 +20,10 @@ import Prettyprinter
       vsep,
       pipe,
       dquotes,
+      list,
       Doc,
       Pretty(pretty) )
+import Data.List ((\\))
 
 --Colores
 nonTerminalColor :: Doc AnsiStyle -> Doc AnsiStyle
@@ -38,6 +41,15 @@ nt2doc (NT nt) = nonTerminalColor (pretty nt)
 
 t2doc :: T -> Doc AnsiStyle
 t2doc t = dquotes $ terminalColor (pretty $ runT t)
+
+printTs :: [T] -> Doc AnsiStyle
+printTs [] = pretty ""
+printTs [t] = t2doc t
+printTs (t:ts) = list $ t2doc t:[printTs ts]
+
+printSimb :: [Rule] -> Doc AnsiStyle
+printSimb rs = let (ts, _) = tsNTsFromRules rs
+               in pretty "Alfabeto: " <> printTs (ts \\ [T ""]) <> pretty "\n" -- le saco el lambda
 
 printRightSideLeft :: RigthSide -> Doc AnsiStyle
 printRightSideLeft (RT t) = t2doc t
@@ -72,10 +84,12 @@ printRulesRight :: [Rule] -> Doc AnsiStyle
 printRulesRight rs = vsep $ map printRuleRight rs
 
 printGramLeft :: GramTerm -> Doc AnsiStyle
-printGramLeft (Gram rus) = printRulesLeft rus
+printGramLeft (Gram []) = pretty "La gramatica no presenta reglas de producción :("
+printGramLeft (Gram rus) = vsep $ printSimb rus: pretty "Reglas:" : [printRulesLeft rus]
 
 printGramRight :: GramTerm -> Doc AnsiStyle
-printGramRight (Gram rus) = printRulesRight rus
+printGramRight (Gram []) = pretty "La gramatica no presenta reglas de producción :("
+printGramRight (Gram rus) = vsep $ printSimb rus: pretty "Reglas:" : [printRulesRight rus]
 
 
 printGram :: Gram -> Doc AnsiStyle
