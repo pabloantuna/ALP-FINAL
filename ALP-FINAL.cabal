@@ -46,7 +46,6 @@ library
     , extra
     , haskeline >=0.8.0.0
     , mtl
-    , pretty
     , prettyprinter
     , prettyprinter-ansi-terminal
     , text
@@ -71,7 +70,6 @@ executable ALP-FINAL-exe
     , extra
     , haskeline >=0.8.0.0
     , mtl
-    , pretty
     , prettyprinter
     , prettyprinter-ansi-terminal
     , text
@@ -95,7 +93,6 @@ test-suite ALP-FINAL-test
     , extra
     , haskeline >=0.8.0.0
     , mtl
-    , pretty
     , prettyprinter
     , prettyprinter-ansi-terminal
     , text
