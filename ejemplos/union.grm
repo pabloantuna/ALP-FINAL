@@ -1,3 +1,22 @@
 & -> "a" A | "b" B | \;
 A -> "b" B | "a" &;
 B -> "b";
+{-
+D [SimbD {runSimbD = "a"},SimbD {runSimbD = "b"}]
+  [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}]
+  (FunT [(St {runSt = 0},SimbD {runSimbD = "a"},St {runSt = 4})
+        ,(St {runSt = 0},SimbD {runSimbD = "b"},St {runSt = 1})
+        ,(St {runSt = 1},SimbD {runSimbD = "a"},St {runSt = 2})
+        ,(St {runSt = 1},SimbD {runSimbD = "b"},St {runSt = 3})
+        ,(St {runSt = 2},SimbD {runSimbD = "a"},St {runSt = 2})
+        ,(St {runSt = 2},SimbD {runSimbD = "b"},St {runSt = 2})
+        ,(St {runSt = 3},SimbD {runSimbD = "a"},St {runSt = 2})
+        ,(St {runSt = 3},SimbD {runSimbD = "b"},St {runSt = 2})
+        ,(St {runSt = 4},SimbD {runSimbD = "a"},St {runSt = 0})
+        ,(St {runSt = 4},SimbD {runSimbD = "b"},St {runSt = 1})])
+  [St {runSt = 0},St {runSt = 3}]
+  (St {runSt = 0})
+  True
+
+  [(St {runSt = 0},SimbD {runSimbD = "a"},St {runSt = 4}),(St {runSt = 0},SimbD {runSimbD = "b"},St {runSt = 1}),(St {runSt = 1},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 1},SimbD {runSimbD = "b"},St {runSt = 3}),(St {runSt = 2},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 2},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 4},SimbD {runSimbD = "a"},St {runSt = 0}),(St {runSt = 4},SimbD {runSimbD = "b"},St {runSt = 1})])
+-}
