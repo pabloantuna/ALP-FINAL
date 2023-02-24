@@ -109,7 +109,7 @@ concatAEFD aefd aefd' = let aefnd  = aefdToAEFND aefd
 -- lenguaje del automata dado. Esto es cambiar los estados
 -- de aceptación para que sean los que no son de aceptación
 -- en el automata dado como argumento a la funcion
-complementAEFD :: AEFDG -> AEFDG
+complementAEFD :: Eq a => AEFD a -> AEFD a
 complementAEFD (D simb sts (FunT f) stsa sti b) = let stsa' = [st | st <- sts, st `notElem` stsa]
                                                   in D simb sts (FunT f) stsa' sti b
 
@@ -164,10 +164,11 @@ inAEFD w aefd@(D simb _ _ _ sti _) = simbolosValidos w simb && acceptFromSt w ae
 
 -- 
 equalAEFD :: AEFDG -> AEFDG -> Bool
-equalAEFD aefd aefd' = let aefdm = minimizeAEFD aefd
-                           aefdm' = minimizeAEFD aefd'
-                           p = intersecAEFD (complementAEFD aefdm) aefdm'
-                           s = intersecAEFD aefdm (complementAEFD aefdm')
+equalAEFD aefd aefd' = let (aefdn, aefdn') = sameSimbs aefd aefd'
+                           aefdm = minimizeAEFD aefdn
+                           aefdm' = minimizeAEFD aefdn'
+                           p = intersecAEFD' (complementAEFD aefdm) aefdm'
+                           s = intersecAEFD' aefdm (complementAEFD aefdm')
                        in emptyLan p && emptyLan s
 
 ---------
@@ -182,14 +183,61 @@ removeUnreachable aefd@(D simbs _ (FunT f) stsa sti b) = let sts' = reachableSta
                                                         in D simbs sts' (FunT f') stsa' sti b
 
 --
-reachableStates :: (Ord a) =>AEFD a -> [St a] -> [St a]
+reachableStates :: (Ord a) => AEFD a -> [St a] -> [St a]
 reachableStates aefd@(D _ _ (FunT f) _ _ _) rsi = 
   let stsNow = [st' | (st, _, st') <- f, st `elem` rsi, st /= st']
   in (if isSubsetOf (fromList stsNow) (fromList rsi) then rsi else reachableStates aefd (nub $ stsNow ++ rsi))
 
+
+--
+partition :: Eq a => [SimbD] -> [(St a, SimbD, St a)] -> [St a] -> [[St a]] -> [[St a]]
+partition simbs f sts pLast = concatMap (partition' []) pLast
+  where 
+    -- funcion que calcula un nuevo conjunto de partición en base
+    -- a la particion anterior
+    partition' n [] = n
+    partition' [] (x:xs) = partition' [[x]] xs
+    partition' (n:ns) (x:xs) = if distinguishable (head n) x then partition' (n:partition' ns [x]) xs else partition' ((x:n):ns) xs
+    -- funcion auxiliar para determinar si dos estados son distinguibles
+    -- esto lo logramos haciendo uso de otra funcion que nos va a devolver el indice k de a que P_k pertenece el estado
+    -- y viendo que ambos estados tengan un k distinto
+    distinguishable st st' = 
+      any (\x -> kPart (head [s | s <- sts, (st, x, s) `elem` f]) pLast 0 /= kPart (head [s | s <- sts, (st', x, s) `elem` f]) pLast 0) simbs -- `Two states ( qi, qj ) are distinguishable in partition Pk if for any input symbol a, δ ( qi, a ) and δ ( qj, a ) are in different sets in partition Pk-1`. O sea que busco a que numero de particion pertenece el estado al cual puedo ir desde estos estados con el mismo simbolo y si son distintos (aunque sea para un simbolo) entonces son distinguishables
+    -- funcion que toma un estado, una particion y un numero que será el indice que ira acumulando
+    -- y devuelve el indice del conjunto de la particion al cual pertenece el estado
+    -- devuelve -1 si no encuentra el estado
+    kPart :: Eq a => St a -> [[St a]] -> Int -> Int
+    kPart _ [] _ = -1 -- no esta en ninguna particion
+    kPart s (x:xs) i = if s `elem` x then i else kPart s xs (i+1) -- si s esta en la particion x entonces devuelvo el indice llevado hasta el momento, si no aumento en 1 el indice y chequeo en el resto de las particiones
+
+-- funcion que dado el conjunto de simbolos de un automata determinista
+-- las transiciones del automata, el conjunto de estados y una partición inicial 
+-- devuelve la minima cantidad de estados necesarios para crear un automata determinista equivalente minimo
+minimizeStates :: (Ord a) => [SimbD] -> [(St a, SimbD, St a)] -> [St a] -> [[St a]] -> [St [a]]
+minimizeStates simbs f sts part = let partK = partition simbs f sts part -- part es mi particion P_k-1 asi que la uso para calcular partK que es P_k
+                                  in if fromList (map fromList partK) == fromList (map fromList part) then map (St . map runSt) part else minimizeStates simbs f sts partK -- usando la igualdad de Set (debido a que no puedo usar el de listas porque el orden de los elementos en la lista me afecta la comparacion, i.e, en listas [1,2,3] /= [1,3,2] pero para mi son iguales entonces uso Set) cuestión, usando esa igualdad comparo P_k con P_k-1 y si son iguales ya esta corto el algoritmo, si no sigo minimizando la cantidad de estados con P_k
+
+-- funcion que dado un automata determinista
+-- devuelve un automata sin los estados no distinguibles
+removeNonDistinguishable :: (Ord a) => AEFD a -> AEFD [a]
+removeNonDistinguishable (D simb sts (FunT f) stsa sti b) = 
+  let p0 = [stsa, sts \\ stsa] -- la primer particion es los estados de aceptacion y los estados que no son de aceptacion
+      sts' = minimizeStates simb f sts p0 -- obtengo la minima cantidad de estados usando el algoritmo de particionado (que en algun lado creo que lei que es Moore pero nadie lo explica muy bien asi que no se)
+      f' = [] -- completar
+      stsa' = [s | s <- sts', intersection (fromList $ runSt s) (fromList (map runSt stsa)) /= empty]
+      sti' = head [s | s <- sts', runSt sti `elem` runSt s]
+  in D simb sts' (FunT f') stsa' sti' b
+
+-- >>> minimizeStates [SimbD {runSimbD = "a"},SimbD {runSimbD = "b"}] [(St {runSt = 0},SimbD {runSimbD = "a"},St {runSt = 4}),(St {runSt = 0},SimbD {runSimbD = "b"},St {runSt = 1}),(St {runSt = 1},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 1},SimbD {runSimbD = "b"},St {runSt = 3}),(St {runSt = 2},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 2},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 4},SimbD {runSimbD = "a"},St {runSt = 0}),(St {runSt = 4},SimbD {runSimbD = "b"},St {runSt = 1})] [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] [[St {runSt = 0},St {runSt = 3}], [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] \\ [St {runSt = 0},St {runSt = 3}]]
+-- [St {runSt = [3]},St {runSt = [0]},St {runSt = [1]},St {runSt = [2]},St {runSt = [4]}]
+
+-- >>> partition [SimbD {runSimbD = "a"},SimbD {runSimbD = "b"}] [(St {runSt = 0},SimbD {runSimbD = "a"},St {runSt = 4}),(St {runSt = 0},SimbD {runSimbD = "b"},St {runSt = 1}),(St {runSt = 1},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 1},SimbD {runSimbD = "b"},St {runSt = 3}),(St {runSt = 2},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 2},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 4},SimbD {runSimbD = "a"},St {runSt = 0}),(St {runSt = 4},SimbD {runSimbD = "b"},St {runSt = 1})] [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] [[St {runSt = 0},St {runSt = 3}], [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] \\ [St {runSt = 0},St {runSt = 3}]]
+-- [[St {runSt = 3},St {runSt = 0}],[St {runSt = 1}],[St {runSt = 2}],[St {runSt = 4}]]
+
+
 -- 
-minimizeAEFD :: Ord a => AEFD a -> AEFD a
-minimizeAEFD = removeUnreachable
+minimizeAEFD :: Ord a => AEFD a -> AEFD [a]
+minimizeAEFD = removeNonDistinguishable . removeUnreachable
 
 ---------
 -- Utilidad varios
