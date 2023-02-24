@@ -114,18 +114,6 @@ gramTermDerToAEFND (Gram rus) = let rules = unificarRules rus -- unifico las reg
                                     sti  = St (Just "&") -- el estado inicial es por convencion del programa el que corresponde al simbolo '&' (el simbolo NT inicial de la gramatica)
                                   in ND simb sts r stsa sti True -- finalmente construyo el automata
 
-
--- >>> gramTermDerToAEFND (Gram [Rule Initial [RTNT (T {runT = "a"}) (NT "T")],Rule (NT "T") [RTNT (T {runT = "b"}) (NT "V"),RTNT (T {runT = "b"}) (NT "W")],Rule (NT "V") [RTNT (T {runT = "b"}) (NT "T")],Rule (NT "W") [RTNT (T {runT = "a"}) (NT "T"),RL]])
--- ND [SimbND {runSimbND = "a"},SimbND {runSimbND = "b"},SimbND {runSimbND = ""}] [St {runSt = Nothing},St {runSt = Just "&"},St {runSt = Just "T"},St {runSt = Just "V"},St {runSt = Just "W"}] (RelT [(St {runSt = Just "&"},SimbND {runSimbND = "a"},St {runSt = Just "T"}),(St {runSt = Just "T"},SimbND {runSimbND = "b"},St {runSt = Just "V"}),(St {runSt = Just "T"},SimbND {runSimbND = "b"},St {runSt = Just "W"}),(St {runSt = Just "V"},SimbND {runSimbND = "b"},St {runSt = Just "T"}),(St {runSt = Just "W"},SimbND {runSimbND = "a"},St {runSt = Just "T"})]) [St {runSt = Nothing},St {runSt = Just "W"}] (St {runSt = Just "&"}) True
-
--- >>> unificarRules [Rule Initial [RTNT (T {runT = "a"}) (NT "T")],Rule (NT "T") [RTNT (T {runT = "b"}) (NT "V"),RTNT (T {runT = "b"}) (NT "W")],Rule (NT "V") [RTNT (T {runT = "b"}) (NT "T")],Rule (NT "W") [RTNT (T {runT = "a"}) (NT "T"),RL]]
---                   [Rule Initial [RTNT (T {runT = "a"}) (NT "T")],Rule (NT "T") [RTNT (T {runT = "b"}) (NT "V"),RTNT (T {runT = "b"}) (NT "W")],Rule (NT "V") [RTNT (T {runT = "b"}) (NT "T")],Rule (NT "W") [RTNT (T {runT = "a"}) (NT "T"),RL]]
-
--- >>> isEstAcep (NT "W") [Rule Initial [RTNT (T {runT = "a"}) (NT "T")],Rule (NT "T") [RTNT (T {runT = "b"}) (NT "V"),RTNT (T {runT = "b"}) (NT "W")],Rule (NT "V") [RTNT (T {runT = "b"}) (NT "T")],Rule (NT "W") [RTNT (T {runT = "a"}) (NT "T"),RL]]
--- True
-
-
-
 -- funcion que pasa un GramTerm correspondiente a una gramatica izquierda
 -- a un automata no determinista, esto lo logro
 -- pasandolo como si fuese una gramatica derehca y realizando el reverse del automata generado
@@ -177,24 +165,3 @@ aefdToGramIzq aefd = let (D _ _ (FunT f) stsa sti _) = aefdToAEFDG $ removeDeadS
 
 aefdToGram :: (Ord a) =>AEFD a -> Gram
 aefdToGram aefd@(D _ _ _ _ _ b) = if b then aefdToGramDer aefd else aefdToGramIzq aefd
-
-
--- RG ["a", "b", ""] ["A", "B", "&"] [RRNT "&" "a" "A", RRNT "&" "b" "B", RRL "&", RRNT "A" "b" "B", RRNT "A" "a" "&", RRT "B" "b"]
--- Right (Gram [Rule Initial [RTNT (T \"a\") (NT \"A\"),RTNT (T \"b\") (NT \"B\"),RL],Rule (NT \"A\") [RTNT (T \"b\") (NT \"B\"),RTNT (T \"a\") Initial],Rule (NT \"B\") [RT (T \"b\")]])
-
--- >>> descomponerRules ([Rule Initial [RTNT (T "a") (NT "A"),RTNT (T "b") (NT "B"),RL],Rule (NT "A") [RTNT (T "b") (NT "B"),RTNT (T "a") Initial],Rule (NT "B") [RT (T "b")]])
--- ([T {runT = "a"},T {runT = "b"},T {runT = ""}],[Initial,NT "A",NT "B"],[])
-
-
--- >>> unificarRules ([Rule Initial [RTNT (T {runT = "a"}) (NT "A"),RTNT (T {runT = "b"}) (NT "B"),RL],Rule (NT "A") [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial],Rule (NT "B") [RT (T {runT = "b"})], Rule (NT "A") [RTNT (T {runT = "c"}) (NT "A"),RTNT (T {runT = "c"}) Initial]])
---                    [Rule Initial [RTNT (T {runT = "a"}) (NT "A"),RTNT (T {runT = "b"}) (NT "B"),RL],Rule (NT "A") [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial,RTNT (T {runT = "c"}) (NT "A"),RTNT (T {runT = "c"}) Initial],Rule (NT "B") [RT (T {runT = "b"})]]
-
--- >>> unificarRules' (Rule (NT "A") [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial]) ([Rule (NT "B") [RT (T {runT = "b"})],Rule (NT "A") [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial]])
--- (Rule (NT "A") [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial],[Rule (NT "B") [RT (T {runT = "b"})]])
-
-
--- >>> nub [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial, RTNT (T {runT = "a"}) Initial]
--- [RTNT (T {runT = "b"}) (NT "B"),RTNT (T {runT = "a"}) Initial]
-
--- >>> NT "A" == NT "A"
--- True

@@ -210,9 +210,9 @@ partition simbs f sts pLast = concatMap (partition' []) pLast
   where
     -- funcion que calcula un nuevo conjunto de partición en base
     -- a la particion anterior
-    partition' n [] = n
-    partition' [] (x:xs) = partition' [[x]] xs
-    partition' (n:ns) (x:xs) = if distinguishable (head n) x then partition' (n:partition' ns [x]) xs else partition' ((x:n):ns) xs
+    partition' n [] = n -- termine de analizar devuelvo lo que junté
+    partition' [] (x:xs) = partition' [[x]] xs -- todavia no junte nada asi que arranco con el primero
+    partition' (n:ns) (x:xs) = if distinguishable (head n) x then partition' (n:partition' ns [x]) xs else partition' ((x:n):ns) xs -- si dos estados son distinguibles entonces spliteamos el conjunto en diferentes conjuntos si no seguimos con el resto normal
     -- funcion auxiliar para determinar si dos estados son distinguibles
     -- esto lo logramos haciendo uso de otra funcion que nos va a devolver el indice k de a que P_k pertenece el estado
     -- y viendo que ambos estados tengan un k distinto
@@ -243,13 +243,6 @@ removeNonDistinguishable (D simb sts (FunT f) stsa sti b) =
       stsa' = [s | s <- sts', intersection (fromList $ runSt s) (fromList (map runSt stsa)) /= empty] -- siguiendo la idea de la formula usada para pasar de aefnd a aefd encuentro los nuevos estados de transicion (la interseccion entre los estados dentro de mi conjunto de estados (que ahora es un estado) con los estados de aceptacion no debe ser vacia, i.e en mi conjunto de estados tiene que haber al menos un estado de aceptacion para que este conjunto sea estado de aceptacion)
       sti' = head [s | s <- sts', runSt sti `elem` runSt s] -- busco el conjunto de estados que tiene al estado inicial en el y ese sera mi nuevo estado inicial
   in D simb sts' (FunT f') stsa' sti' b
-
--- >>> minimizeStates [SimbD {runSimbD = "a"},SimbD {runSimbD = "b"}] [(St {runSt = 0},SimbD {runSimbD = "a"},St {runSt = 4}),(St {runSt = 0},SimbD {runSimbD = "b"},St {runSt = 1}),(St {runSt = 1},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 1},SimbD {runSimbD = "b"},St {runSt = 3}),(St {runSt = 2},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 2},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 4},SimbD {runSimbD = "a"},St {runSt = 0}),(St {runSt = 4},SimbD {runSimbD = "b"},St {runSt = 1})] [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] [[St {runSt = 0},St {runSt = 3}], [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] \\ [St {runSt = 0},St {runSt = 3}]]
--- [St {runSt = [3]},St {runSt = [0]},St {runSt = [1]},St {runSt = [2]},St {runSt = [4]}]
-
--- >>> partition [SimbD {runSimbD = "a"},SimbD {runSimbD = "b"}] [(St {runSt = 0},SimbD {runSimbD = "a"},St {runSt = 4}),(St {runSt = 0},SimbD {runSimbD = "b"},St {runSt = 1}),(St {runSt = 1},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 1},SimbD {runSimbD = "b"},St {runSt = 3}),(St {runSt = 2},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 2},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "a"},St {runSt = 2}),(St {runSt = 3},SimbD {runSimbD = "b"},St {runSt = 2}),(St {runSt = 4},SimbD {runSimbD = "a"},St {runSt = 0}),(St {runSt = 4},SimbD {runSimbD = "b"},St {runSt = 1})] [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] [[St {runSt = 0},St {runSt = 3}], [St {runSt = 0},St {runSt = 1},St {runSt = 2},St {runSt = 3},St {runSt = 4}] \\ [St {runSt = 0},St {runSt = 3}]]
--- [[St {runSt = 3},St {runSt = 0}],[St {runSt = 1}],[St {runSt = 2}],[St {runSt = 4}]]
-
 
 -- funcion que toma un automata determinista
 -- y devuelve otro minimizado donde sus estados pasan de ser de tipo a a tipo [a]
