@@ -20,10 +20,10 @@ import Prettyprinter
       vsep,
       pipe,
       dquotes,
-      list,
+      comma,
       Doc,
       Pretty(pretty) )
-import Data.List ((\\))
+import Data.List ((\\), sort)
 
 --Colores
 nonTerminalColor :: Doc AnsiStyle -> Doc AnsiStyle
@@ -45,11 +45,11 @@ t2doc t = dquotes $ terminalColor (pretty $ runT t)
 printTs :: [T] -> Doc AnsiStyle
 printTs [] = pretty ""
 printTs [t] = t2doc t
-printTs (t:ts) = list $ t2doc t:[printTs ts]
+printTs (t:ts) = t2doc t <> comma <> printTs ts
 
 printSimb :: [Rule] -> Doc AnsiStyle
 printSimb rs = let (ts, _) = tsNTsFromRules rs
-               in pretty "Alfabeto: " <> printTs (ts \\ [T ""]) <> pretty "\n" -- le saco el lambda
+               in pretty "Alfabeto: {" <> printTs (sort ts \\ [T ""]) <> pretty "}\n" -- le saco el lambda
 
 printRightSideLeft :: RigthSide -> Doc AnsiStyle
 printRightSideLeft (RT t) = t2doc t

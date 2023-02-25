@@ -3,8 +3,7 @@ module Grammar where
 
 import Common
 import FiniteAutomata
-import Data.List ( nub )
-
+import Data.List ( nub, sort )
 -- funcion para obtener a partir de una lista del lado derecho de una regla de produccion
 -- una tupla con dos listas
 -- la primera es la lista de terminales
@@ -139,23 +138,26 @@ gramDerToAEFDG = aefdToAEFDG . aefndToAEFD . gramTermDerToAEFND
 gramToAEFDG :: Gram -> AEFDG
 gramToAEFDG = either gramIzqToAEFDG gramDerToAEFDG
 
-funToRule :: (Eq a, Show a) => St a -> (St a, SimbD, St a) -> Rule
-funToRule sti (s, t, s') | s == sti = Rule Initial [RTNT (T $ runSimbD t) (NT $ show $ runSt s')]
-                         | otherwise = Rule (NT $ show $ runSt s) [RTNT (T $ runSimbD t) (if sti == s' then NT "&" else NT $ show $ runSt s')]
+funToRule :: St Int -> (St Int, SimbD, St Int) -> Rule
+funToRule sti (s, t, s') | s == sti = Rule Initial [RTNT (T $ runSimbD t) (NT $ show $ if s' > sti then runSt s' - 1 else runSt s')]
+                         | s < sti = Rule (NT $ show $ runSt s) [RTNT (T $ runSimbD t) (if sti == s' then NT "&" else NT $ show $ if s' > sti then runSt s' - 1 else runSt s')]
+                         | otherwise = Rule (NT $ show $ runSt s - 1) [RTNT (T $ runSimbD t) (if sti == s' then NT "&" else NT $ show $ if s' > sti then runSt s' - 1 else runSt s')]
 
-funToRules :: (Eq a, Show a) => [(St a, SimbD, St a)] -> St a -> [Rule]
+funToRules :: [(St Int, SimbD, St Int)] -> St Int -> [Rule]
 funToRules r sti = map (funToRule sti) r
 
-staToFinishRule :: (Eq a, Show a) => St a -> St a -> Rule
+staToFinishRule :: St Int -> St Int -> Rule
 staToFinishRule sti st | st == sti = Rule Initial [RL]
-                       | otherwise = Rule (NT $ show $ runSt st) [RL]
+                       | st < sti = Rule (NT $ show $ runSt st) [RL]
+                       | otherwise = Rule (NT $ show $ runSt st - 1) [RL]
 
-stsaToFinishRules :: (Eq a, Show a) => St a -> [St a] -> [Rule]
+stsaToFinishRules :: St Int -> [St Int] -> [Rule]
 stsaToFinishRules sti = map (staToFinishRule sti)
 
 aefdToGramDer :: (Ord a) => AEFD a -> Gram
 aefdToGramDer aefd = let (D _ _ (FunT f) stsa sti _) = aefdToAEFDG $ removeDeadStates $ minimizeAEFD aefd
-                         rus = unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
+                         rus' = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
+                         rus = last rus':init rus'
                      in Right $ Gram rus
 
 aefdToGramIzq :: (Ord a) => AEFD a -> Gram
