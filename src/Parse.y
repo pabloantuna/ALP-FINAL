@@ -19,21 +19,31 @@ import Data.Char
     '='            { TDef }                   -- la asignacion de una gramatica a un nombre
     '|'            { TOr }                    -- el or de las reglas de gramatica (BNF)
     '\\'           { TLambda }                -- el lambda, o sea la cadena vacia
-    ';'            { TEnd }                   -- simplemente un punto y coma para terminar la regla de produccion (estamos siguiendo la sintaxis del pdf de la catedra)
-    '?'            { TIn }                    -- para consultar si una cadena pertenece a un lenguaje (cadena *in* lenguaje, por eso In)
+    ';'            { TEnd }                   -- el punto y coma para terminar la regla de produccion
+    '?'            { TIn }                    -- para consultar si una cadena pertenece a un lenguaje
     '=='           { TEqual }                 -- para consultar la equivalencia de dos gramaticas
     '+'            { TUnion }                 -- para la union de dos gramaticas
-    '.'            { TIntersec }              -- para la interseccion de dos gramaticas (no hay motivo de por que un punto simplemente no soy bueno eligiendo simbolos)
-    '-'            { TDiff }                  -- para la resta de dos gramaticas (algunos simbolos si tienen motivo de eleccion claramente je)
-    '++'           { TConcat }                -- para la concatenacion de dos gramaticas (simplemente es este simbolo por la concatenacion de listas en haskell)
-    '~'            { TComplement }            -- para el complemento de una gramatica (casi seguro que ~ es literalmente el simbolo de complemento de conjunto en algun lado)
-    '~~'           { TReverse }               -- para hacer el reverso de una gramatica (aca de nuevo me quede sin ideas de simbolos)
-    '!'            { TSide }                  -- para pasar de derecha (izquierda) a izquierda (derecha) (aca nuevamente me quede sin ideas de simbolos je)
+    '.'            { TIntersec }              -- para la interseccion de dos gramaticas
+    '-'            { TDiff }                  -- para la resta de dos gramaticas
+    '++'           { TConcat }                -- para la concatenacion de dos gramaticas
+    '~'            { TComplement }            -- para el complemento de una gramatica
+    '~~'           { TReverse }               -- para hacer el reverso de una gramatica
+    '!'            { TSide }                  -- para pasar de derecha (izquierda) a izquierda (derecha)
     T              { TT $$ }                  -- los simbolos terminales
     NT             { TNT $$ }                 -- los simbolos no terminales
     '('            { TOpen }                  -- abrir parentesis para tener cosas como g1 + (g2 - g3)
-    ')'            { TClose }                 -- cerrar parentesis para lo mismo obviamente je
+    ')'            { TClose }                 -- cerrar parentesis
 
+%left '=='
+%nonassoc '?'
+%nonassoc '='
+%left '+' '-'
+%left '!' 
+%left '.'
+%nonassoc '->'
+%nonassoc ';'
+%left '|'
+%nonassoc '&'
 
 %%
 ----------------------------------------------------
@@ -95,7 +105,7 @@ Grammar : NT                                   { OpGram $1 } -- seria el nombre,
         | Grammar '~'                          { OpComplement $1 }
         | Grammar '~~'                         { OpReverse $1 }
         | Grammar '!'                          { OpSide $1 }
-        | '(' Grammar ')'                      { $2 } -- parentesis, no estoy seguro con las precedencias de nada eso incluye la precedencia de la regla esta
+        | '(' Grammar ')'                      { $2 }
 
 Op    : NT '=' Grammar                         { OpDef $1 $3 }
       | Grammar '==' Grammar                   { OpEqual $1 $3 }
@@ -187,7 +197,7 @@ lexer cont s = case s of
                     unknown -> \line -> Failed $ 
                      "Línea "++(show line)++": No se puede reconocer "++(show $ take 10 unknown)++ "..."
                     where lexT cs = case span (/= '"') cs of -- anteriormente era con isAlphaNum pero no tuve en cuenta espacios xd
-                              (t, '"':rest) -> cont (TT t) rest -- tal vez sacar espacios depende como lo termine manejando pero no me hago problema porque seguro termina siendo agregar un filter o algo por el estilo
+                              (t, '"':rest) -> cont (TT t) rest
                               ([], _) -> \line -> Failed $ "Línea "++(show line)++": El terminal es vacio eso ta raro no?"
                           consumirBK anidado cl cont s = case s of
                               ('-':('-':cs)) -> consumirBK anidado cl cont $ dropWhile ((/=) '\n') cs
