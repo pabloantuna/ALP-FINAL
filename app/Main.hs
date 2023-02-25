@@ -127,17 +127,17 @@ handleCommand state@(S inter env) cmd = case cmd of
   Print s ->
     let g = findGram env s
     in case g of
-      Nothing -> lift $ putStrLn ("No se ha encontrado la gramatica buscada: " ++ show s) >> return (Just state)
+      Nothing -> lift $ putStrLn ("No se ha encontrado la gramatica buscada: " ++ s) >> return (Just state)
       Just ae -> printGrammar ae >> return (Just state)
   LPrint s ->
     let g = findGram env s
     in case g of
-      Nothing -> lift $ putStrLn "No se ha encontrado la gramatica buscada_:" >> return (Just state)
+      Nothing -> lift $ putStrLn ("No se ha encontrado la gramatica buscada: " ++ s) >> return (Just state)
       Just ae -> printGrammarL ae >> return (Just state)
   RPrint s ->
     let g = findGram env s
     in case g of
-      Nothing -> lift $ putStrLn "No se ha encontrado la gramatica buscada-:" >> return (Just state)
+      Nothing -> lift $ putStrLn ("No se ha encontrado la gramatica buscada: " ++ s) >> return (Just state)
       Just ae -> printGrammarR ae >> return (Just state)
   Interactive s -> do
     state' <- compilePhrase state s
