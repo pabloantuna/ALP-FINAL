@@ -37,7 +37,7 @@ terminalColor = annotate (color Green)
 
 nt2doc :: NT -> Doc AnsiStyle
 nt2doc Initial = nonTerminalColor (pretty "&")
-nt2doc (NT nt) = nonTerminalColor (pretty nt)
+nt2doc (NT nt) = nonTerminalColor (pretty (tail $ init nt)) -- fix horrendo para sacar las comillas
 
 t2doc :: T -> Doc AnsiStyle
 t2doc t = dquotes $ terminalColor (pretty $ runT t)
