@@ -18,7 +18,7 @@ import           System.IO               hiding ( print )
 import           Common
 import           PPrint ( printGram, render )
 import           Parse
-import           Eval 
+import           Eval
 import           Grammar
 import           FiniteAutomata
 
@@ -109,7 +109,7 @@ interpretCommand x = lift $ if isPrefixOf ":" x
   else return (Interactive x)
 
 validExtension :: String -> Bool
-validExtension = isSuffixOf ".grm"
+validExtension s = ".grm" `isSuffixOf` reverse (dropWhile isSpace (reverse s))
 
 handleCommand :: State -> Command -> InputT IO (Maybe State)
 handleCommand state@(S inter env) cmd = case cmd of
@@ -119,11 +119,11 @@ handleCommand state@(S inter env) cmd = case cmd of
   Browse -> lift $ do
     putStr (unlines [ s | s <- reverse (nub (map fst env)) ])
     return (Just state)
-  Compile n f -> if validExtension f 
+  Compile n f -> if validExtension f
     then do
       state' <- compileFile state f n
       return (Just state')
-    else lift $ putStrLn "El archivo debe ser de extension .grm" >> return (Just state)
+    else lift $ putStrLn ("El archivo " ++ f ++ " debe ser de extension .grm") >> return (Just state)
   Print s ->
     let g = findGram env s
     in case g of
@@ -190,8 +190,8 @@ compileFile state@(S inter v) f name = do
   maybe (return state) (addGram state name) gram
 
 addGram :: State -> String -> Gram -> InputT IO State
-addGram state@(S inter env) name gram = 
-  do 
+addGram state@(S inter env) name gram =
+  do
     let gram' = gramToAEFDG gram
      in return (S inter (replace name gram' env))
 
