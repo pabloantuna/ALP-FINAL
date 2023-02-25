@@ -3,7 +3,8 @@ module Grammar where
 
 import Common
 import FiniteAutomata
-import Data.List ( nub, sort )
+import Data.List ( nub, sort, delete, elemIndex )
+import Data.Char ( chr )
 -- funcion para obtener a partir de una lista del lado derecho de una regla de produccion
 -- una tupla con dos listas
 -- la primera es la lista de terminales
@@ -138,32 +139,42 @@ gramDerToAEFDG = aefdToAEFDG . aefndToAEFD . gramTermDerToAEFND
 gramToAEFDG :: Gram -> AEFDG
 gramToAEFDG = either gramIzqToAEFDG gramDerToAEFDG
 
-funToRule :: St Int -> (St Int, SimbD, St Int) -> Rule
-funToRule sti (s, t, s') | s == sti = Rule Initial [RTNT (T $ runSimbD t) (NT $ show $ if s' > sti then runSt s' - 1 else runSt s')]
-                         | s < sti = Rule (NT $ show $ runSt s) [RTNT (T $ runSimbD t) (if sti == s' then NT "&" else NT $ show $ if s' > sti then runSt s' - 1 else runSt s')]
-                         | otherwise = Rule (NT $ show $ runSt s - 1) [RTNT (T $ runSimbD t) (if sti == s' then NT "&" else NT $ show $ if s' > sti then runSt s' - 1 else runSt s')]
+aefdForPrinting :: Eq a => AEFD a -> AEFD String
+aefdForPrinting (D simb sts (FunT f) stsa sti b) =
+  let stsp = delete sti sts
+      renameNT i = chr (65 + (i `mod` 26)):show (i `div` 26)
+      stateRename st = case elemIndex st stsp of
+                              Nothing -> if st == sti then St "&" else error "No tiene sentido encontrar un estado que no este en esta lista y no sea el inicial"
+                              Just i -> St $ renameNT i
+      f' = map (\(st, t, st') -> (stateRename st, t, stateRename st')) f
+      stsa' = map stateRename stsa
+      sti' = St "&"
+      sts' = sti':map stateRename stsp
+  in D simb sts' (FunT f') stsa' sti' b
 
-funToRules :: [(St Int, SimbD, St Int)] -> St Int -> [Rule]
+funToRule :: (Eq a, Show a) => St a -> (St a, SimbD, St a) -> Rule
+funToRule sti (s, t, s') | s == sti = Rule Initial [RTNT (T $ runSimbD t) (NT $ show $ runSt s')]
+                         | otherwise = Rule (NT $ show $ runSt s) [RTNT (T $ runSimbD t) (if sti == s' then NT "&" else NT $ show $ runSt s')]
+
+funToRules :: (Eq a, Show a) => [(St a, SimbD, St a)] -> St a -> [Rule]
 funToRules r sti = map (funToRule sti) r
 
-staToFinishRule :: St Int -> St Int -> Rule
+staToFinishRule :: (Eq a, Show a) => St a -> St a -> Rule
 staToFinishRule sti st | st == sti = Rule Initial [RL]
-                       | st < sti = Rule (NT $ show $ runSt st) [RL]
-                       | otherwise = Rule (NT $ show $ runSt st - 1) [RL]
+                       | otherwise = Rule (NT $ show $ runSt st) [RL]
 
-stsaToFinishRules :: St Int -> [St Int] -> [Rule]
+stsaToFinishRules :: (Eq a, Show a) => St a -> [St a] -> [Rule]
 stsaToFinishRules sti = map (staToFinishRule sti)
 
 aefdToGramDer :: (Ord a) => AEFD a -> Gram
-aefdToGramDer aefd = let (D _ _ (FunT f) stsa sti _) = aefdToAEFDG $ removeDeadStates $ minimizeAEFD aefd
-                         rus' = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
-                         rus = last rus':init rus'
-                     in Right $ Gram rus
+aefdToGramDer aefd = let (D _ _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD aefd
+                         rus = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
+                     in Right $ Gram $ last rus:init rus
 
 aefdToGramIzq :: (Ord a) => AEFD a -> Gram
-aefdToGramIzq aefd = let (D _ _ (FunT f) stsa sti _) = aefdToAEFDG $ removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
-                         rus = unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
-                     in Left $ Gram rus
+aefdToGramIzq aefd = let (D _ _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
+                         rus = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
+                     in Left $ Gram $ last rus:init rus
 
 aefdToGram :: (Ord a) =>AEFD a -> Gram
 aefdToGram aefd@(D _ _ _ _ _ b) = if b then aefdToGramDer aefd else aefdToGramIzq aefd
