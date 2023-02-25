@@ -193,9 +193,7 @@ addGram :: State -> String -> Gram -> InputT IO State
 addGram state@(S inter env) name gram = 
   do 
     let gram' = gramToAEFDG gram
-        gram'' = either gramTermDerToAEFND gramTermDerToAEFND gram
-        gram''' = aefndToAEFD gram''
-     in lift (putStrLn (show gram''')) >> return (S inter (replace name gram' env))
+     in return (S inter (replace name gram' env))
 
 replace :: String -> AEFDG -> Env -> Env
 replace name gram [] = [(name, gram)]
