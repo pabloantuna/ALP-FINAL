@@ -62,12 +62,12 @@ printRightSideRight (RTNT t nt) = sep $ t2doc t:[nt2doc nt]
 printRightSideRight RL = terminalColor $ pretty "\\"
 
 printRightSidesLeft :: [RigthSide] -> [Doc AnsiStyle]
-printRightSidesLeft [rs] = [printRightSideLeft rs]
+printRightSidesLeft [rs] = [printRightSideLeft rs <> pretty ";"]
 printRightSidesLeft (rs:rss) = printRightSideLeft rs:(bnfColor pipe:printRightSidesLeft rss)
 printRightSidesLeft [] = error "no deberia pasar"
 
 printRightSidesRight :: [RigthSide] -> [Doc AnsiStyle]
-printRightSidesRight [rs] = [printRightSideRight rs]
+printRightSidesRight [rs] = [printRightSideRight rs <> pretty ";"]
 printRightSidesRight (rs:rss) = printRightSideRight rs:(bnfColor pipe:printRightSidesRight rss)
 printRightSidesRight [] = error "no deberia pasar"
 
