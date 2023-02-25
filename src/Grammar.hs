@@ -154,7 +154,7 @@ aefdForPrinting (D simb sts (FunT f) stsa sti b) =
 
 funToRule :: (Eq a, Show a) => St a -> (St a, SimbD, St a) -> Rule
 funToRule sti (s, t, s') | s == sti = Rule Initial [RTNT (T $ runSimbD t) (NT $ show $ runSt s')]
-                         | otherwise = Rule (NT $ show $ runSt s) [RTNT (T $ runSimbD t) (if sti == s' then NT "&" else NT $ show $ runSt s')]
+                         | otherwise = Rule (NT $ show $ runSt s) [RTNT (T $ runSimbD t) (if sti == s' then Initial else NT $ show $ runSt s')]
 
 funToRules :: (Eq a, Show a) => [(St a, SimbD, St a)] -> St a -> [Rule]
 funToRules r sti = map (funToRule sti) r
@@ -169,12 +169,12 @@ stsaToFinishRules sti = map (staToFinishRule sti)
 aefdToGramDer :: (Ord a) => AEFD a -> Gram
 aefdToGramDer aefd = let (D _ _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD aefd
                          rus = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
-                     in Right $ Gram $ last rus:init rus
+                     in Right $ Gram $ if null rus then [] else last rus:init rus
 
 aefdToGramIzq :: (Ord a) => AEFD a -> Gram
 aefdToGramIzq aefd = let (D _ _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
                          rus = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
-                     in Left $ Gram $ last rus:init rus
+                     in Left $ Gram $ if null rus then [] else last rus:init rus
 
 aefdToGram :: (Ord a) =>AEFD a -> Gram
 aefdToGram aefd@(D _ _ _ _ _ b) = if b then aefdToGramDer aefd else aefdToGramIzq aefd
