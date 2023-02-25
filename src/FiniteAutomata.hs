@@ -172,12 +172,13 @@ inAEFD w aefd@(D simb _ _ _ sti _) = simbolosValidos w simb && acceptFromSt w ae
 -- esto seria equivalente a chequear que al restar las palabras de uno o del otro el resultado sea que no puedo aceptar ninguna palabra
 -- i.e aceptan solo las mismas palabras => son equivalentes
 equalAEFD :: AEFDG -> AEFDG -> Bool
-equalAEFD aefd aefd' = let (aefdn, aefdn') = sameSimbs aefd aefd' -- igualo simbolos
-                           aefdm = minimizeAEFD aefdn -- minimizo el primero
-                           aefdm' = minimizeAEFD aefdn' -- minimizo el segundo
-                           p = intersecAEFD' (complementAEFD aefdm) aefdm' -- interseccion del complemento del primero con el segundo
-                           s = intersecAEFD' aefdm (complementAEFD aefdm') -- interseccion del primero con el complemento del segundo
-                       in emptyLan p && emptyLan s -- chequeo aceptacion del lenguaje vacio en ambos resultados
+equalAEFD aefd@(D simbs _ _ _ _ _) aefd'@(D simbs' _ _ _ _ _) | fromList simbs /= fromList simbs' = False
+                                                              | otherwise =
+  let aefdm  = minimizeAEFD aefd -- minimizo el primero
+      aefdm' = minimizeAEFD aefd' -- minimizo el segundo
+      p      = intersecAEFD' (complementAEFD aefdm) aefdm' -- interseccion del complemento del primero con el segundo
+      s      = intersecAEFD' aefdm (complementAEFD aefdm') -- interseccion del primero con el complemento del segundo
+  in emptyLan p && emptyLan s -- chequeo aceptacion del lenguaje vacio en ambos resultados
 
 ---------
 -- Minimizar automata determinista
