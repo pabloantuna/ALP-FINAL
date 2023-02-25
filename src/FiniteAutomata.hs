@@ -21,6 +21,7 @@ agregarSimbDs (D simb sts (FunT f) stsa sti b) simbsNuevos = let simb' = nub $ s
                                                                  sts' = St Nothing:map (St . Just . runSt) sts
                                                                  f' = map (\(st, x, st') -> (St $ Just $ runSt st, x, St $ Just $ runSt st')) f -- el mapeo a maybe de las transiciones existentes
                                                                   ++ [(st, x, St Nothing) | st <- sts', x <- simbsNuevos] -- las transiciones basura de los nuevos simbolos
+                                                                  ++ [(St Nothing, x, St Nothing) | x <- simb] -- las transiciones del nuevo estado basura para los simbolos viejos
                                                                  stsa' = map (St . Just . runSt) stsa
                                                                  sti' = St $ Just $ runSt sti
                                                              in D simb' sts' (FunT f') stsa' sti' b
