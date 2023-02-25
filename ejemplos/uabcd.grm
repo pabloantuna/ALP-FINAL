@@ -1,0 +1,9 @@
+{-
+Gramatica para la unión de ab y cd
+-}
+
+& -> "a" A | "c" C | \;
+A -> "b" B;
+B -> "a" A | \;
+C -> "d" D;
+D -> "c" C | \;
