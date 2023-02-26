@@ -1,3 +1,4 @@
+{- Gramatica derecha del pdf de la consigna -}
 & -> "a" A | "b" B | \;
 A -> "b" B | "a" &;
 B -> "b";
