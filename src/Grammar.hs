@@ -166,15 +166,15 @@ staToFinishRule sti st | st == sti = Rule Initial [RL]
 stsaToFinishRules :: (Eq a, Show a) => St a -> [St a] -> [Rule]
 stsaToFinishRules sti = map (staToFinishRule sti)
 
-aefdToGramDer :: (Ord a) => AEFD a -> Gram
-aefdToGramDer aefd = let (D _ _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD aefd
+aefdToGramDer :: (Ord a) => AEFD a -> GramShow
+aefdToGramDer aefd = let (D simb _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD aefd
                          rus = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
-                     in Right $ Gram $ if null rus then [] else last rus:init rus
+                     in Right $ GramShow (map (\(SimbD s) -> T s) simb) $ if null rus then [] else last rus:init rus
 
-aefdToGramIzq :: (Ord a) => AEFD a -> Gram
-aefdToGramIzq aefd = let (D _ _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
+aefdToGramIzq :: (Ord a) => AEFD a -> GramShow
+aefdToGramIzq aefd = let (D simb _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
                          rus = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
-                     in Left $ Gram $ if null rus then [] else last rus:init rus
+                     in Left $ GramShow (map (\(SimbD s) -> T s) simb) $ if null rus then [] else last rus:init rus
 
-aefdToGram :: (Ord a) =>AEFD a -> Gram
+aefdToGram :: (Ord a) =>AEFD a -> GramShow
 aefdToGram aefd@(D _ _ _ _ _ b) = if b then aefdToGramDer aefd else aefdToGramIzq aefd

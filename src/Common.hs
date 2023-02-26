@@ -10,6 +10,13 @@ module Common where
   newtype GramTerm = Gram [Rule]
     deriving (Eq, Ord, Show)
 
+  -- estructura de datos que es como GramTerm pero ademas lleva a los simbolos terminales de la gramatica
+  data GramShowTerm = GramShow [T] [Rule]
+    deriving (Eq, Ord, Show)
+
+  -- segun si es izquierda o derecha
+  type GramShow = Either GramShowTerm GramShowTerm
+
   -- una regla de produccion de una gramatica esta dada por
   -- un no terminal que seria A en A -> generacion1 | generacion2 y una lista que seria [generacion1, generacion2]
   -- en caso de tener varias reglas A -> generacion1 A -> generacion2 seran 2 reglas distintas por mas que sean del mismo no terminal
