@@ -5,6 +5,7 @@ import Common
 import FiniteAutomata
 import Data.List ( nub, sort, delete, elemIndex )
 import Data.Char ( chr )
+
 -- funcion para obtener a partir de una lista del lado derecho de una regla de produccion
 -- una tupla con dos listas
 -- la primera es la lista de terminales
@@ -19,7 +20,7 @@ tsNTsFromRightSide ((RTNT t nt) : xs) = let (ts', nts') = tsNTsFromRightSide xs
                                             nts = if nt `elem` nts' then nts' else nt:nts'
                                         in (ts, nts)
 tsNTsFromRightSide (RL : xs) = let (ts', nts) = tsNTsFromRightSide xs
-                                   ts = if T "" `elem` ts' then ts' else T "":ts'
+                                   ts = if "" `elem` ts' then ts' else "":ts'
                                in (ts, nts)
 
 tsNTsFromRule :: Rule -> ([T], [NT])
@@ -104,31 +105,22 @@ flagToLeft (ND sns sts rt st's st _) = ND sns sts rt st's st False
 -- cuando este en un no terminal que genera un terminal y no tiene
 -- ningun otro no terminal, i.e NT -> t => del estado NT puedo llegar a Nothing (estado aceptacion) tomando t
 gramTermDerToAEFND :: GramTerm -> AEFND (Maybe String)
-gramTermDerToAEFND (Gram rus) = let rules = unificarRules rus -- unifico las reglas para que sea mas facil de trabajar
-                                    (ts, nts) = tsNTsFromRules rules -- obtengo los terminales y no terminales
-                                    simb = map (SimbND . runT) ts -- los simbolos (alfabeto) del automata son los terminales de la gramatica
-                                    sts  = St Nothing : map (St . Just . ntToString) nts -- los estados seran el nuevo estado de aceptacion Nothing + todos los no terminales
-                                    r    = RelT (nub $ ([((St . Just . ntToString) st1, (SimbND . runT) t, (St . Just . ntToString) st2) | st1 <- nts, t <- ts, st2 <- nts, isRel st1 t st2 rules]) -- las relaciones que permiten pasar de un estado a otro (la regla NT -> NT' => existe una relacion (NT, "", NT'))
-                                                    ++ ([((St . Just . ntToString) st1, (SimbND . runT) t, St Nothing) | st1 <- nts, t <- ts, acceptTerminal st1 t rules])) -- los estados que aceptan la entrada de un terminal pero no van a ningun otro estado (NT -> t => consumiendo t voy a Nothing, i.e existe la relacion (NT, t, Nothing))
-                                    stsa = St Nothing : [(St . Just . ntToString) nt | nt <- nts, isEstAcep nt rules] -- los estados de aceptacion son el nuevo estado Nothing + los estados que acepten la cadena vacia
-                                    sti  = St (Just "&") -- el estado inicial es por convencion del programa el que corresponde al simbolo '&' (el simbolo NT inicial de la gramatica)
-                                  in ND simb sts r stsa sti True -- finalmente construyo el automata
+gramTermDerToAEFND (Gram rus) = let rules = unificarRules rus
+                                    (ts, nts) = tsNTsFromRules rules
+                                    simb = ts
+                                    sts  = Nothing : map (Just . ntToString) nts
+                                    r    = (nub $ ([((Just . ntToString) st1, t, (Just . ntToString) st2) | st1 <- nts, t <- ts, st2 <- nts, isRel st1 t st2 rules])
+                                               ++ ([((Just . ntToString) st1, t, Nothing) | st1 <- nts, t <- ts, acceptTerminal st1 t rules]))
+                                    stsa = Nothing : [(Just . ntToString) nt | nt <- nts, isEstAcep nt rules]
+                                    sti  = Just "&"
+                                  in ND simb sts r stsa sti True
 
 -- funcion que pasa un GramTerm correspondiente a una gramatica izquierda
 -- a un automata no determinista, esto lo logro
 -- pasandolo como si fuese una gramatica derehca y realizando el reverse del automata generado
--- porque eso encontre en todos los foros (TODO: ver si hay otra forma)
 -- finalmente le marco el bool del AEFND en false para indicar que es izquierda para mas adelante
 gramTermIzqToAEFND :: GramTerm -> AEFND (Maybe (Maybe String))
 gramTermIzqToAEFND = flagToLeft . reverseAEFND . gramTermDerToAEFND
-
--- funcion que pasa de un Gram a un Either de AEFND de izq o der
--- ya que como el reverse del automata devuelve estados Maybe pero el pasar
--- una gram derecha a AEFND tambien devuelve Maybe entonces la gramatica izquierda
--- termina siendo pasada a automata de estados Maybe Maybe mientras que la derecha simplemente Maybe
--- (igual capaz esta funcion directamente vuela y termino usando las otras de forma directa depende como note que es mas comodo)
--- gramToAEFND :: Gram -> Either (AEFND (Maybe (Maybe String))) (AEFND (Maybe String))
--- gramToAEFND = either (Left . gramTermIzqToAEFND) (Right . gramTermDerToAEFND)
 
 gramIzqToAEFDG :: GramTerm -> AEFDG
 gramIzqToAEFDG = aefdToAEFDG . aefndToAEFD . gramTermIzqToAEFND
@@ -140,41 +132,41 @@ gramToAEFDG :: Gram -> AEFDG
 gramToAEFDG = either gramIzqToAEFDG gramDerToAEFDG
 
 aefdForPrinting :: Eq a => AEFD a -> AEFD String
-aefdForPrinting (D simb sts (FunT f) stsa sti b) =
+aefdForPrinting (D simb sts f stsa sti b) =
   let stsp = delete sti sts
       renameNT i = chr (65 + (i `mod` 26)):show (i `div` 26)
       stateRename st = case elemIndex st stsp of
-                              Nothing -> if st == sti then St "&" else error "No tiene sentido encontrar un estado que no este en esta lista y no sea el inicial"
-                              Just i -> St $ renameNT i
+                              Nothing -> if st == sti then "&" else error "No tiene sentido encontrar un estado que no este en esta lista y no sea el inicial"
+                              Just i -> renameNT i
       f' = map (\(st, t, st') -> (stateRename st, t, stateRename st')) f
       stsa' = map stateRename stsa
-      sti' = St "&"
+      sti' = "&"
       sts' = sti':map stateRename stsp
-  in D simb sts' (FunT f') stsa' sti' b
+  in D simb sts' f' stsa' sti' b
 
 funToRule :: (Eq a, Show a) => St a -> (St a, SimbD, St a) -> Rule
-funToRule sti (s, t, s') | s == sti = Rule Initial [RTNT (T $ runSimbD t) (NT $ show $ runSt s')]
-                         | otherwise = Rule (NT $ show $ runSt s) [RTNT (T $ runSimbD t) (if sti == s' then Initial else NT $ show $ runSt s')]
+funToRule sti (s, t, s') | s == sti = Rule Initial [RTNT t (NT $ show s')]
+                         | otherwise = Rule (NT $ show s) [RTNT t (if sti == s' then Initial else NT $ show s')]
 
 funToRules :: (Eq a, Show a) => [(St a, SimbD, St a)] -> St a -> [Rule]
 funToRules r sti = map (funToRule sti) r
 
 staToFinishRule :: (Eq a, Show a) => St a -> St a -> Rule
 staToFinishRule sti st | st == sti = Rule Initial [RL]
-                       | otherwise = Rule (NT $ show $ runSt st) [RL]
+                       | otherwise = Rule (NT $ show st) [RL]
 
 stsaToFinishRules :: (Eq a, Show a) => St a -> [St a] -> [Rule]
 stsaToFinishRules sti = map (staToFinishRule sti)
 
 aefdToGramDer :: (Ord a) => AEFD a -> GramShow
-aefdToGramDer aefd = let (D simb _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD aefd
+aefdToGramDer aefd = let (D simb _ f stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD aefd
                          rus = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
-                     in Right $ GramShow (map (\(SimbD s) -> T s) simb) $ if null rus then [] else last rus:init rus
+                     in Right $ GramShow simb $ if null rus then [] else last rus:init rus
 
 aefdToGramIzq :: (Ord a) => AEFD a -> GramShow
-aefdToGramIzq aefd = let (D simb _ (FunT f) stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
+aefdToGramIzq aefd = let (D simb _ f stsa sti _) = aefdForPrinting $ removeDeadStates $ minimizeAEFD $ reverseAEFD aefd
                          rus = sort $ unificarRules $ funToRules f sti ++ stsaToFinishRules sti stsa
-                     in Left $ GramShow (map (\(SimbD s) -> T s) simb) $ if null rus then [] else last rus:init rus
+                     in Left $ GramShow simb $ if null rus then [] else last rus:init rus
 
 aefdToGram :: (Ord a) =>AEFD a -> GramShow
 aefdToGram aefd@(D _ _ _ _ _ b) = if b then aefdToGramDer aefd else aefdToGramIzq aefd

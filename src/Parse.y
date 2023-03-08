@@ -14,31 +14,31 @@ import Data.Char
 %lexer {lexer} {TEOF}
 
 %token
-    '&'            { TInit }                  -- el sigma de la def de gramatica, el simbolo inicial (siempre va a ser & el simbolo inicial en nuestro programa, no podemos elegirlo a mano)
-    '->'           { TArrow }                 -- la flechita para la regla de produccion
-    '='            { TDef }                   -- la asignacion de una gramatica a un nombre
-    '|'            { TOr }                    -- el or de las reglas de gramatica (BNF)
-    '\\'           { TLambda }                -- el lambda, o sea la cadena vacia
-    ';'            { TEnd }                   -- el punto y coma para terminar la regla de produccion
-    '?'            { TIn }                    -- para consultar si una cadena pertenece a un lenguaje
-    '=='           { TEqual }                 -- para consultar la equivalencia de dos gramaticas
-    '+'            { TUnion }                 -- para la union de dos gramaticas
-    '.'            { TIntersec }              -- para la interseccion de dos gramaticas
-    '-'            { TDiff }                  -- para la resta de dos gramaticas
-    '++'           { TConcat }                -- para la concatenacion de dos gramaticas
-    '~'            { TComplement }            -- para el complemento de una gramatica
-    '~~'           { TReverse }               -- para hacer el reverso de una gramatica
-    '!'            { TSide }                  -- para pasar de derecha (izquierda) a izquierda (derecha)
-    T              { TT $$ }                  -- los simbolos terminales
-    NT             { TNT $$ }                 -- los simbolos no terminales
-    '('            { TOpen }                  -- abrir parentesis para tener cosas como g1 + (g2 - g3)
-    ')'            { TClose }                 -- cerrar parentesis
+    '&'            { TInit }
+    '->'           { TArrow }
+    '='            { TDef }
+    '|'            { TOr }
+    '\\'           { TLambda }
+    ';'            { TEnd }
+    '?'            { TIn }
+    '=='           { TEqual }
+    '+'            { TUnion }
+    '.'            { TIntersec }
+    '-'            { TDiff }
+    '++'           { TConcat }
+    '~'            { TComplement }
+    '~~'           { TReverse }
+    '!'            { TSide }
+    T              { TT $$ }
+    NT             { TNT $$ }
+    '('            { TOpen }
+    ')'            { TClose }
 
 %left '=='
 %nonassoc '?'
 %nonassoc '='
 %left '+' '-'
-%left '.' 
+%left '.'
 %left '++'
 %nonassoc '~' '~~' '!'
 %nonassoc '->'
@@ -47,29 +47,24 @@ import Data.Char
 %nonassoc '&'
 
 %%
-----------------------------------------------------
---- Toda la parte de la definicion de la gramatica
---- onda sus reglas de produccion y eso
---- lo que se cargaria de un archivo .grm
-----------------------------------------------------
 
 -- lado izquierdo de una regla de produccion puede tener el simbolo inicial el cual distinguimos del resto por obvias razones, o un simbolo No Terminal (NT)
 LeftSide : '&'                                 { Initial }
          | NT                                  { NT $1 }
 
 -- lado derecho de una regla de produccion para una gramatica izquierda
-RightGIzq : NT T                               { RTNT (T $2) (NT $1) }
-          | '&' T                              { RTNT (T $2) Initial }
-          | T                                  { RT (T $1) }
+RightGIzq : NT T                               { RTNT $2 (NT $1) }
+          | '&' T                              { RTNT $2 Initial }
+          | T                                  { RT $1 }
           | '\\'                               { RL }
 
 RightSideGIzq : RightGIzq                      { [$1] }
               | RightGIzq '|' RightSideGIzq    { $1 : $3 }
 
 -- lado derecho de una regla de produccion para una gramatica derecha
-RightGDer : T NT                               { RTNT (T $1) (NT $2)}
-          | T '&'                              { RTNT (T $1) Initial }
-          | T                                  { RT (T $1) }
+RightGDer : T NT                               { RTNT $1 (NT $2)}
+          | T '&'                              { RTNT $1 Initial }
+          | T                                  { RT $1 }
           | '\\'                               { RL }
 
 RightSideGDer : RightGDer                      { [$1] }
@@ -90,15 +85,10 @@ RGrammar  : RightG ';'                         { [$1] }
           | RightG ';' RGrammar                { $1 : $3 }
 
 -- la gramatica puede ser izquierda o derecha
-Gram  : LGrammar                               { Left (Gram $1) } -- LITERALMENTE RECORDE LA EXISTENCIA DE EITHER CUANDO ESCRIBI LEFT Y RIGHT ACA GRACIAS HASKELL POR TANTO VIVA MESSI
+Gram  : LGrammar                               { Left (Gram $1) }
       | RGrammar                               { Right (Gram $1) }
 
-----------------------------------------------------
---- Toda la parte de la estructura OpGram
---- seria la parte de las operaciones (union interseccion etc)
-----------------------------------------------------
-
-Grammar : NT                                   { OpGram $1 } -- seria el nombre, se me ocurre representarlo con NT porque si no tengo que agregar un token name, agregarlo al data y al lexer y es literalmente lo mismo, un string
+Grammar : NT                                   { OpGram $1 }
         | Grammar '+' Grammar                  { OpUnion $1 $3 }
         | Grammar '.' Grammar                  { OpIntersec $1 $3 }
         | Grammar '-' Grammar                  { OpDiff $1 $3 }
@@ -163,11 +153,6 @@ data Token = TInit
            | TEOF
   deriving Show
 
---------------------------------------------------------------------
---- El laboratorio de Lexer 
---- (jaja chistesito por el laboratorio de Dexter no se suena parecido estoy quemado)
---------------------------------------------------------------------
-
 lexer cont s = case s of
                     [] -> cont TEOF []
                     ('\n':s)  ->  \line -> lexer cont s (line + 1)
@@ -197,7 +182,7 @@ lexer cont s = case s of
                     (')':cs) -> cont TClose cs
                     unknown -> \line -> Failed $ 
                      "Línea "++(show line)++": No se puede reconocer "++(show $ take 10 unknown)++ "..."
-                    where lexT cs = case span (/= '"') cs of -- anteriormente era con isAlphaNum pero no tuve en cuenta espacios xd
+                    where lexT cs = case span (/= '"') cs of
                               (t, '"':rest) -> cont (TT t) rest
                               ([], _) -> \line -> Failed $ "Línea "++(show line)++": El terminal es vacio eso ta raro no?"
                           consumirBK anidado cl cont s = case s of

@@ -17,14 +17,14 @@ import Data.Maybe (fromJust)
 -- creando un nuevo estado basura y las transiciones correspondientes
 -- de todos los estados con los nuevos simbolos al estado basura
 agregarSimbDs :: AEFD a -> [SimbD] -> AEFD (Maybe a)
-agregarSimbDs (D simb sts (FunT f) stsa sti b) simbsNuevos = let simb' = nub $ simb ++ simbsNuevos
-                                                                 sts' = St Nothing:map (St . Just . runSt) sts
-                                                                 f' = map (\(st, x, st') -> (St $ Just $ runSt st, x, St $ Just $ runSt st')) f -- el mapeo a maybe de las transiciones existentes
-                                                                  ++ [(st, x, St Nothing) | st <- sts', x <- simbsNuevos] -- las transiciones basura de los nuevos simbolos
-                                                                  ++ [(St Nothing, x, St Nothing) | x <- simb] -- las transiciones del nuevo estado basura para los simbolos viejos
-                                                                 stsa' = map (St . Just . runSt) stsa
-                                                                 sti' = St $ Just $ runSt sti
-                                                             in D simb' sts' (FunT f') stsa' sti' b
+agregarSimbDs (D simb sts f stsa sti b) simbsNuevos = let simb' = nub $ simb ++ simbsNuevos
+                                                          sts' = Nothing:map Just sts
+                                                          f' = map (\(st, x, st') -> (Just st, x, Just st')) f
+                                                                ++ [(st, x, Nothing) | st <- sts', x <- simbsNuevos]
+                                                                ++ [(Nothing, x, Nothing) | x <- simb]
+                                                          stsa' = map Just stsa
+                                                          sti' = Just sti
+                                                      in D simb' sts' f' stsa' sti' b
 
 -- funcion auxiliar que realiza lo que seria en si la union de los dos
 -- automatas pero que tiene en cuenta que ya se realizo una
@@ -34,12 +34,12 @@ agregarSimbDs (D simb sts (FunT f) stsa sti b) simbsNuevos = let simb' = nub $ s
 -- correspondientes a todo el conjunto (i.e ya pasaron por la funcion sameSimbs)
 -- notar que la unica diferencia con la interseccion es cuales son los estados de aceptación
 unionAEFD' :: (Eq a, Eq b) => AEFD a -> AEFD b -> AEFD (a, b)
-unionAEFD' (D simb sts (FunT f) stsa sti b) (D _ sts' (FunT f') stsa' sti' b') = let sti'' = St (runSt sti, runSt sti')
-                                                                                     sts'' = [St (runSt st, runSt st') | st <- sts, st' <- sts']
-                                                                                     f'' = [(St (q1, q3), x, St (q2, q4)) | x <- simb, St (q1, q3) <- sts'', St (q2, q4) <- sts'', (St q1, x, St q2) `elem` f, (St q3, x, St q4) `elem` f']
-                                                                                     stsa'' = [St (q1, q2) | St (q1, q2) <- sts'', elem (St q1) stsa || elem (St q2) stsa']
-                                                                                     b'' = b && b'
-                                                                                 in D simb sts'' (FunT f'') stsa'' sti'' b''
+unionAEFD' (D simb sts f stsa sti b) (D _ sts' f' stsa' sti' b') = let sti'' = (sti, sti')
+                                                                       sts'' = [(st, st') | st <- sts, st' <- sts']
+                                                                       f'' = [((q1, q3), x, (q2, q4)) | x <- simb, (q1, q3) <- sts'', (q2, q4) <- sts'', (q1, x, q2) `elem` f, (q3, x, q4) `elem` f']
+                                                                       stsa'' = [(q1, q2) | (q1, q2) <- sts'', elem q1 stsa || elem q2 stsa']
+                                                                       b'' = b && b'
+                                                                   in D simb sts'' f'' stsa'' sti'' b''
 
 -- funcion que dado dos dfa devuelve otros dos con el mismo conjunto de simbolos
 -- agregandole a cada uno los simbolos que no tengan del otro y las transiciones 
@@ -68,12 +68,12 @@ unionAEFD aefd aefd' = let (aefdn, aefdn') = sameSimbs aefd aefd'
 -- correspondientes a todo el conjunto (i.e ya pasaron por la funcion sameSimbs)
 -- notar que la unica diferencia con la union es cuales son los estados de aceptación
 intersecAEFD' :: (Eq a, Eq b) => AEFD a -> AEFD b -> AEFD (a, b)
-intersecAEFD' (D simb sts (FunT f) stsa sti b) (D _ sts' (FunT f') stsa' sti' b') = let sti'' = St (runSt sti, runSt sti')
-                                                                                        sts'' = [St (runSt st, runSt st') | st <- sts, st' <- sts']
-                                                                                        f'' = [(St (q1, q3), x, St (q2, q4)) | x <- simb, St (q1, q3) <- sts'', St (q2, q4) <- sts'', (St q1, x, St q2) `elem` f, (St q3, x, St q4) `elem` f']
-                                                                                        stsa'' = [St (q1, q2) | St (q1, q2) <- sts'', St q1 `elem` stsa, St q2 `elem` stsa']
-                                                                                        b'' = b && b'
-                                                                                    in D simb sts'' (FunT f'') stsa'' sti'' b''
+intersecAEFD' (D simb sts f stsa sti b) (D _ sts' f' stsa' sti' b') = let sti'' = (sti, sti')
+                                                                          sts'' = [(st, st') | st <- sts, st' <- sts']
+                                                                          f'' = [((q1, q3), x, (q2, q4)) | x <- simb, (q1, q3) <- sts'', (q2, q4) <- sts'', (q1, x, q2) `elem` f, (q3, x, q4) `elem` f']
+                                                                          stsa'' = [(q1, q2) | (q1, q2) <- sts'', q1 `elem` stsa, q2 `elem` stsa']
+                                                                          b'' = b && b'
+                                                                      in D simb sts'' f'' stsa'' sti'' b''
 
 -- funcion que realiza la interseccion de dos automatas deterministas
 -- generando primero dos nuevos automatas iguales a los dados pero con
@@ -110,8 +110,8 @@ concatAEFD aefd aefd' = let aefnd  = aefdToAEFND aefd
 -- de aceptación para que sean los que no son de aceptación
 -- en el automata dado como argumento a la funcion
 complementAEFD :: Eq a => AEFD a -> AEFD a
-complementAEFD (D simb sts (FunT f) stsa sti b) = let stsa' = [st | st <- sts, st `notElem` stsa]
-                                                  in D simb sts (FunT f) stsa' sti b
+complementAEFD (D simb sts f stsa sti b) = let stsa' = [st | st <- sts, st `notElem` stsa]
+                                           in D simb sts f stsa' sti b
 
 -- funcion que dado un automata determinista
 -- devuelve el automata determinista que acepta el lenguaje
@@ -133,7 +133,7 @@ reverseAEFD = aefdToAEFDG . aefndToAEFD . reverseAEFND . aefdToAEFND
 -- imprimir a derecha o a izquierda y de esta forma esto tiene un uso
 -- que es: se va a mostrar la gramatica segun si el booleano indica derecha o izquierda
 sideAEFD :: AEFDG -> AEFDG
-sideAEFD (D simb sts f stsa sti b) = D simb sts f stsa sti (not b) -- cambio el bool que indica si era izq o der
+sideAEFD (D simb sts f stsa sti b) = D simb sts f stsa sti (not b)
 
 ----------
 -- Las operaciones booleanas
@@ -145,22 +145,22 @@ sideAEFD (D simb sts f stsa sti b) = D simb sts f stsa sti (not b) -- cambio el 
 -- True -> el lenguaje acepta desde ese estado la palabra dada
 -- False -> el lenguaje no acepta la palabra dada desde el estado dado
 acceptFromSt :: Eq a => String -> AEFD a -> St a -> Bool
-acceptFromSt [] (D _ _ _ stsa _ _) st = st `elem` stsa -- cuando ya no tengo simbolos que consumir entonces me fijo si el estado en el cual estoy es de aceptacion, si es asi, la palabra es aceptada si no no
-acceptFromSt (x:xs) aefd@(D _ sts (FunT f) _ _ _) st = let st' = head [s | s <- sts, (st, SimbD [x], s) `elem` f] -- lista de a lo sumo un solo elemento (debido al determinismo del automata) donde ese elemento es el siguiente estado al cual voy consumiendo el simbolo actual (Obs: esta lista nunca sera vacia porque ya se chequeo que todos los simbolos pertenezcan a mi alfabeto por lo cual siempre voy a algun estado aunque sea el estado basura)
-                                                       in acceptFromSt xs aefd st' -- llamada recursiva con el resto de caracteres a consumir y el estado al cual debo ir ahora
+acceptFromSt [] (D _ _ _ stsa _ _) st = st `elem` stsa
+acceptFromSt (x:xs) aefd@(D _ sts f _ _ _) st = let st' = head [s | s <- sts, (st, [x], s) `elem` f]
+                                                in acceptFromSt xs aefd st'
 
 -- Funcion que dado un string y un conjunto de simbolos pertenecientes
 -- a un automata determinista determina si todos los simbolos de la string
 -- pertenecen al conjunto de simbolos del automata
 simbolosValidos :: String -> [SimbD] -> Bool
-simbolosValidos s simb = all (\c -> SimbD [c] `elem` simb) s -- todos los simbolos de la palabra estan en mi alfabeto
+simbolosValidos s simb = all (\c -> [c] `elem` simb) s
 
 -- funcion que dada una palabra y un automata
 -- determina si dicha palabra pertenece al lenguaje representado por el automata
 -- obs: palabra en el sentido de palabra de un lenguaje, por ejemplo si el lenguaje acepta el caracter ' ' (espacio) entonces
 -- "hola mundo" cuenta como una palabra y no dos
 inAEFD :: String -> AEFDG -> Bool
-inAEFD w aefd@(D simb _ _ _ sti _) = simbolosValidos w simb && acceptFromSt w aefd sti -- si los simbolos son validos y la palabra es aceptada en el automata desde el estado de inicio
+inAEFD w aefd@(D simb _ _ _ sti _) = simbolosValidos w simb && acceptFromSt w aefd sti
 
 -- funcion que dado dos automatas deterministas que representan una gramatica
 -- devuelve un Bool indicando si son gramaticas equivalentes (True) o no (False)
@@ -174,11 +174,11 @@ inAEFD w aefd@(D simb _ _ _ sti _) = simbolosValidos w simb && acceptFromSt w ae
 equalAEFD :: AEFDG -> AEFDG -> Bool
 equalAEFD aefd@(D simbs _ _ _ _ _) aefd'@(D simbs' _ _ _ _ _) | fromList simbs /= fromList simbs' = False
                                                               | otherwise =
-  let aefdm  = minimizeAEFD aefd -- minimizo el primero
-      aefdm' = minimizeAEFD aefd' -- minimizo el segundo
-      p      = intersecAEFD' (complementAEFD aefdm) aefdm' -- interseccion del complemento del primero con el segundo
-      s      = intersecAEFD' aefdm (complementAEFD aefdm') -- interseccion del primero con el complemento del segundo
-  in emptyLan p && emptyLan s -- chequeo aceptacion del lenguaje vacio en ambos resultados
+  let aefdm  = minimizeAEFD aefd
+      aefdm' = minimizeAEFD aefd'
+      p      = intersecAEFD' (complementAEFD aefdm) aefdm'
+      s      = intersecAEFD' aefdm (complementAEFD aefdm')
+  in emptyLan p && emptyLan s
 
 ---------
 -- Minimizar automata determinista
@@ -187,19 +187,19 @@ equalAEFD aefd@(D simbs _ _ _ _ _) aefd'@(D simbs' _ _ _ _ _) | fromList simbs /
 -- funcion que dado un automata determinista
 -- devuelve otro que no presenta estados inalcanzables
 removeUnreachable :: Ord a => AEFD a -> AEFD a
-removeUnreachable aefd@(D simbs _ (FunT f) stsa sti b) = let sts' = reachableStates aefd [sti] -- obtengo los estados alcanzables a partir del estado inicial
-                                                             f' = filter (\(st, _, st') -> st `elem` sts' && st' `elem` sts') f -- mi nuevo f son los que tengan a los estados alcanzables
-                                                             stsa' = intersect stsa sts' -- los estados de aceptacion son los que antes eran de aceptacion pero que esten en mi lista de estados nueva
-                                                        in D simbs sts' (FunT f') stsa' sti b
+removeUnreachable aefd@(D simbs _ f stsa sti b) = let sts' = reachableStates aefd [sti]
+                                                      f' = filter (\(st, _, st') -> st `elem` sts' && st' `elem` sts') f
+                                                      stsa' = intersect stsa sts'
+                                                  in D simbs sts' f' stsa' sti b
 
 -- Función que toma un automata determinista
 -- y un conjunto de estados
 -- y devuelve el conjunto de estados al cual se puede llegar
 -- desde los estados dados
 reachableStates :: (Ord a) => AEFD a -> [St a] -> [St a]
-reachableStates aefd@(D _ _ (FunT f) _ _ _) rsi =
-  let stsNow = [st' | (st, _, st') <- f, st `elem` rsi, st /= st'] -- calcula los estados alcanzables en esta iteración
-  in (if isSubsetOf (fromList stsNow) (fromList rsi) then rsi else reachableStates aefd (nub $ stsNow ++ rsi)) -- si los estados alcanzables en esta iteracion estan contenidos en los estados que ya tengo guardados entonces ya terminé y devuelvo mis estados hasta el momento. Si no en la llamada recursiva para la proxima iteracion incluyo los estados de esta iteracion a los estados que ya tengo
+reachableStates aefd@(D _ _ f _ _ _) rsi =
+  let stsNow = [st' | (st, _, st') <- f, st `elem` rsi, st /= st']
+  in (if isSubsetOf (fromList stsNow) (fromList rsi) then rsi else reachableStates aefd (nub $ stsNow ++ rsi))
 
 
 -- funcion que dado el conjunto de simbolos del automata determinista
@@ -212,39 +212,39 @@ partition simbs f sts pLast = concatMap (partition' []) pLast
   where
     -- funcion que calcula un nuevo conjunto de partición en base
     -- a la particion anterior
-    partition' n [] = n -- termine de analizar devuelvo lo que junté
-    partition' [] (x:xs) = partition' [[x]] xs -- todavia no junte nada asi que arranco con el primero
-    partition' (n:ns) (x:xs) = if distinguishable (head n) x then partition' (n:partition' ns [x]) xs else partition' ((x:n):ns) xs -- si dos estados son distinguibles entonces spliteamos el conjunto en diferentes conjuntos si no seguimos con el resto normal
+    partition' n [] = n
+    partition' [] (x:xs) = partition' [[x]] xs
+    partition' (n:ns) (x:xs) = if distinguishable (head n) x then partition' (n:partition' ns [x]) xs else partition' ((x:n):ns) xs
     -- funcion auxiliar para determinar si dos estados son distinguibles
     -- esto lo logramos haciendo uso de otra funcion que nos va a devolver el indice k de a que P_k pertenece el estado
     -- y viendo que ambos estados tengan un k distinto
     distinguishable st st' =
-      any (\x -> kPart (head [s | s <- sts, (st, x, s) `elem` f]) pLast 0 /= kPart (head [s | s <- sts, (st', x, s) `elem` f]) pLast 0) simbs -- `Two states ( qi, qj ) are distinguishable in partition Pk if for any input symbol a, δ ( qi, a ) and δ ( qj, a ) are in different sets in partition Pk-1`. O sea que busco a que numero de particion pertenece el estado al cual puedo ir desde estos estados con el mismo simbolo y si son distintos (aunque sea para un simbolo) entonces son distinguishables
+      any (\x -> kPart (head [s | s <- sts, (st, x, s) `elem` f]) pLast 0 /= kPart (head [s | s <- sts, (st', x, s) `elem` f]) pLast 0) simbs
     -- funcion que toma un estado, una particion y un numero que será el indice que ira acumulando
     -- y devuelve el indice del conjunto de la particion al cual pertenece el estado
     -- devuelve -1 si no encuentra el estado
     kPart :: Eq a => St a -> [[St a]] -> Int -> Int
-    kPart _ [] _ = -1 -- no esta en ninguna particion
-    kPart s (x:xs) i = if s `elem` x then i else kPart s xs (i+1) -- si s esta en la particion x entonces devuelvo el indice llevado hasta el momento, si no aumento en 1 el indice y chequeo en el resto de las particiones
+    kPart _ [] _ = -1
+    kPart s (x:xs) i = if s `elem` x then i else kPart s xs (i+1)
 
 -- funcion que dado el conjunto de simbolos de un automata determinista
 -- las transiciones del automata, el conjunto de estados y una partición inicial 
 -- devuelve la minima cantidad de estados necesarios para crear un automata determinista equivalente minimo
 minimizeStates :: (Ord a) => [SimbD] -> [(St a, SimbD, St a)] -> [St a] -> [[St a]] -> [St [a]]
-minimizeStates simbs f sts part = let partK = partition simbs f sts part -- part es mi particion P_k-1 asi que la uso para calcular partK que es P_k
-                                  in if fromList (map fromList partK) == fromList (map fromList part) then map (St . map runSt) part else minimizeStates simbs f sts partK -- usando la igualdad de Set (debido a que no puedo usar el de listas porque el orden de los elementos en la lista me afecta la comparacion, i.e, en listas [1,2,3] /= [1,3,2] pero para mi son iguales entonces uso Set) cuestión, usando esa igualdad comparo P_k con P_k-1 y si son iguales ya esta corto el algoritmo, si no sigo minimizando la cantidad de estados con P_k
+minimizeStates simbs f sts part = let partK = partition simbs f sts part
+                                  in if fromList (map fromList partK) == fromList (map fromList part) then part else minimizeStates simbs f sts partK
 
 -- funcion que dado un automata determinista
 -- devuelve un automata sin los estados no distinguibles
 removeNonDistinguishable :: (Ord a) => AEFD a -> AEFD [a]
-removeNonDistinguishable (D simb sts (FunT f) stsa sti b) =
-  let p0 = [stsa, sts \\ stsa] -- la primer particion es los estados de aceptacion y los estados que no son de aceptacion
-      sts' = minimizeStates simb f sts p0 -- obtengo la minima cantidad de estados usando el algoritmo de particionado (que en algun lado creo que lei que es Moore pero nadie lo explica muy bien asi que no se)
-      f' = [(st, x, st') | st<-sts', x<-simb, st'<-sts', existTransition st x st'] -- mi nueva funcion de transicion van a ser los estados nuevos con el simbolo correspondiente si es que existia en el automata originar una transicion usando ese simbolo desde al menos un estado del conjunto de estas st al conjunto de estados st' (i.e (st, x, st') es una transicion si existe una transicion en el automata original que vaya de algun estado de st a algun estado de st' a traves de x )
-      existTransition st x st' = or $ concatMap (\s -> map (\s' -> (St s, x, St s') `elem` f) (runSt st') ) (runSt st) -- esta es la funcion que me dice si efectivamente existe algun estado de st que vaya a algun estado de st' a traves de x. Esto lo busco mapeando sobre los estados de st (primer conjunto de estados) una funcion que mapea sobre st' (segundo conjunto de estados) y se fija si existe la transicion original de cada estado de st a cada estado de st' a traves de x, si al menos una existe entonces tengo que considerar que existe una nueva relacion para mi nuevo automata que va de st a st' usando x
-      stsa' = [s | s <- sts', intersection (fromList $ runSt s) (fromList (map runSt stsa)) /= empty] -- siguiendo la idea de la formula usada para pasar de aefnd a aefd encuentro los nuevos estados de transicion (la interseccion entre los estados dentro de mi conjunto de estados (que ahora es un estado) con los estados de aceptacion no debe ser vacia, i.e en mi conjunto de estados tiene que haber al menos un estado de aceptacion para que este conjunto sea estado de aceptacion)
-      sti' = head [s | s <- sts', runSt sti `elem` runSt s] -- busco el conjunto de estados que tiene al estado inicial en el y ese sera mi nuevo estado inicial
-  in D simb sts' (FunT f') stsa' sti' b
+removeNonDistinguishable (D simb sts f stsa sti b) =
+  let p0 = [stsa, sts \\ stsa]
+      sts' = minimizeStates simb f sts p0
+      f' = [(st, x, st') | st<-sts', x<-simb, st'<-sts', existTransition st x st']
+      existTransition st x st' = or $ concatMap (\s -> map (\s' -> (s, x, s') `elem` f) st' ) st
+      stsa' = [s | s <- sts', intersection (fromList s) (fromList stsa) /= empty]
+      sti' = head [s | s <- sts', sti `elem` s]
+  in D simb sts' f' stsa' sti' b
 
 -- funcion que toma un automata determinista
 -- y devuelve otro minimizado donde sus estados pasan de ser de tipo a a tipo [a]
@@ -269,33 +269,25 @@ minimizeAEFD = removeNonDistinguishable . removeUnreachable
 -- debe ser uno solo lo resolvemos permitiendo ir a cualquiera de esos estados
 -- desde un nuevo estado inicial que solo existe para dicha funcion (el estado Nothing)
 reverseAEFND :: AEFND a -> AEFND (Maybe a)
-reverseAEFND (ND simb sts (RelT r) stsa sti b) = let sts'     = St Nothing : map (\(St x) -> St $ Just x) sts -- mis estados van a aser los mismos (llevados al nuevo tipo maybe a) y un estado nuevo Nothing
-                                                     rLambda  = [(St Nothing, SimbND "", St $ Just s) | (St s) <- stsa] -- creo relaciones empty transition que vayan del nuevo estado Nothing hacia cada estado de aceptación
-                                                     rReverse = [(St $ Just s2, SimbND t, St $ Just s1) | (St s1, SimbND t, St s2) <- r] -- creo relaciones a partir de las ya existentes dandolas vueltas (si antes de A->B consumiendo x ahora de B->A consumiendo x)
-                                                     r'       = rLambda ++ rReverse -- mi relacion es la union de las dos relaciones creadas arriba
-                                                     stsa'    = [St $ Just $ runSt sti] -- tengo un solo estado de aceptacion y es el que antes era el inicial
-                                                     sti'     = St Nothing -- mi nuevo estado inicial es el estado nuevo Nothing
-                                                 in ND simb sts' (RelT r') stsa' sti' b
+reverseAEFND (ND simb sts r stsa sti b) = let sts'     = Nothing : map Just sts
+                                              rLambda  = [(Nothing, "", Just s) | s <- stsa]
+                                              rReverse = [(Just s2, t, Just s1) | (s1, t, s2) <- r]
+                                              r'       = rLambda ++ rReverse
+                                              stsa'    = [Just sti]
+                                              sti'     = Nothing
+                                          in ND simb sts' r' stsa' sti' b
 
 -- funcion que toma un estado, una lista de estados y una lista de relaciones
 -- y devuelve una lista de todos los estados
 -- que son alcanzables a traves de lambda transitions desde el estado tomado como primer arg
 lambdaReach :: (Eq a) => St a -> [St a] -> [(St a, SimbND, St a)] -> [St a]
-lambdaReach st sts r = let vecinosLambdaDirectos = lambdaReach' (sts \\ [st]) -- no me interesa alcanzarme a mi mismo a traves de lambda transitions asi que me saco de los estados a chequear
-                           sts' = sts \\ (st:vecinosLambdaDirectos) -- los estados que me interesan ahora son los que no alcance de forma directa ni soy yo
-                           vecinosLambdaIndirectos = concatMap (\x -> lambdaReach x sts' r) vecinosLambdaDirectos -- calculo los vecinos lambda de mis vecinos lambdas recursivamente
-                       in nub $ vecinosLambdaDirectos ++ vecinosLambdaIndirectos -- uno los resultados y saco repetidos
-  where lambdaReach' [] = [] -- caso base trivial
-        lambdaReach' (x:xs) | (st, SimbND "", x) `elem` r = x:lambdaReach' xs -- si tengo una lambda transition de st a x tomo ese x y lo agrego a la lista que construyo recursivamente viendo a que otros llego de forma directa con lambda transitions y a cuales llego a traves de ese x luego saco repetidos
-                            | otherwise                   = lambdaReach' xs -- si no llego a ese x con una lambda transition entonces sigo viendo a que otros estados llego
-
---------------------------------------------------------------------
---- Toda esta parte es horrible y confusa y me gustaria buscar
---- otra forma de hacerlo pero no me da mas la cabeza
---- voy a intentar comentarlo de la forma mas comprensible posible
---- pero la verdad es que por mas que no se me ocurra otra cosa
---- lo siento muy como atado con alambre asi que TODO: mejorar el pasaje a AEFD
---------------------------------------------------------------------
+lambdaReach st sts r = let vecinosLambdaDirectos = lambdaReach' (sts \\ [st])
+                           sts' = sts \\ (st:vecinosLambdaDirectos)
+                           vecinosLambdaIndirectos = concatMap (\x -> lambdaReach x sts' r) vecinosLambdaDirectos
+                       in nub $ vecinosLambdaDirectos ++ vecinosLambdaIndirectos
+  where lambdaReach' [] = []
+        lambdaReach' (x:xs) | (st, "", x) `elem` r = x:lambdaReach' xs
+                            | otherwise            = lambdaReach' xs
 
 -- esta funcion toma los simbolos del no determinista
 -- los estados originales del no determinista
@@ -314,8 +306,8 @@ lambdaReach st sts r = let vecinosLambdaDirectos = lambdaReach' (sts \\ [st]) --
 -- devolviendo la funcion/relacion hibrida acumulada hasta el momento, si no la calculada actualmente pasa a ser la ultima y es agregada a la acumulacion
 -- en una nueva llamada recursiva
 allReach'' :: (Ord a) => [SimbND] -> [St a] -> [(St a, SimbND, St a)] -> [(St (Set a), SimbND, St (Set a))] -> [(St (Set a), SimbND, St (Set a))] -> [(St (Set a), SimbND, St (Set a))]
-allReach'' simbs sts r fLast fAcum = let fNow = concatMap (\(_, _, s') -> map (\x -> (s', x, St $ allReach' (runSt s') x sts r)) simbs) fLast -- calculo como seria la relacion/funcion (es un hibrido en este paso) de transicion de este paso (i.e los que alcanzaría en esta iteracion)
-                                     in (if isSubsetOf (fromList fNow) (fromList fAcum) then fAcum else allReach'' simbs sts r fNow (nub $ fNow ++ fAcum)) -- si los que calcule en esta iteración ya son un subconjunto de los que tenia calculado entonces ya termine y devuelvo los acumulado (i.e si estoy calculando estados que ya tengo entonces ya esta) si no agrego mis estados a los acumulados y recursivamente busco los que siguen a los que calcule en esta iteracion
+allReach'' simbs sts r fLast fAcum = let fNow = concatMap (\(_, _, s') -> map (\x -> (s', x, allReach' s' x sts r)) simbs) fLast
+                                     in (if isSubsetOf (fromList fNow) (fromList fAcum) then fAcum else allReach'' simbs sts r fNow (nub $ fNow ++ fAcum))
 
 -- esta funcion toma un estado del determinista (conjunto de estados) un simbolo no determinista
 -- los estados originales del no determinista y la relacion del no determinista
@@ -325,14 +317,14 @@ allReach'' simbs sts r fLast fAcum = let fNow = concatMap (\(_, _, s') -> map (\
 -- puedo alcanzar con cada simbolo (y con lambdaTransitions desde esos nuevos estados, 
 -- i.e S -> A consumiendo "a" pero luego de A puede ir a B sin consumir nada entonces
 -- {S} puede ir a A consumiendo "a" pero también puede ir a B consumiendo "a"
--- por lo que tendriamos {S} -> {A} consumiendo "a")
+-- por lo que tendriamos {S} -> {A, B} consumiendo "a")
 -- Luego de obtener los estados van a estar como una lista de Set entonces lo foldeo con la union
 -- y obtengo efectivamente el nuevo estado determinista (conjunto de estados del no determinista)
 -- al cual puedo ir desde mi estado st pasado como arg
 allReach' :: (Ord a) => Set a -> SimbND -> [St a] -> [(St a, SimbND, St a)] -> Set a
-allReach' st x sts r = fold S.union empty $ S.map reach st -- foldeo la union de conjuntos con el conjunto vacio como elemento base en la lista de conjuntos que obtengo
-  where reach s = let vecinosDirectos = fromList [runSt s' | s' <- sts, (St s, x, s') `elem` r] -- calculo mis vecinos directos a los que puedo hacer una transicion con un simbolo (no lambda transition)
-                  in S.union vecinosDirectos (allReach' vecinosDirectos (SimbND "") sts r) -- hago la union de todo lo que alcanzo de forma directa con los simbolos + los estados alcanzados por lambda transition de esos que alcance de forma directa. Otra opcion para esto seria mapear la funcion lambdaReach pero es medio como que peor en eficiencia: (fromList $ concatMap (\estadito -> map runSt $ lambdaReach (St estadito) sts r) (toList vecinosDirectos))
+allReach' st x sts r = fold S.union empty $ S.map reach st
+  where reach s = let vecinosDirectos = fromList [s' | s' <- sts, (s, x, s') `elem` r]
+                  in S.union vecinosDirectos (allReach' vecinosDirectos "" sts r)
 
 -- funcion que va a tomar el estado inicial del determinista
 -- los simbolos del no determinista, los estados del no determinista
@@ -345,8 +337,8 @@ allReach' st x sts r = fold S.union empty $ S.map reach st -- foldeo la union de
 -- luego hago uso de otra funcion auxiliar allReach'' la cual me va a devolver la funcion/relacion hibrida completa
 -- por ultimo la mapeo al tipo de funcion de transicion cambiando los simbolos 
 allReach :: (Ord a) => St (Set a) -> [SimbND] -> [St a] -> [(St a, SimbND, St a)] -> [(St (Set a), SimbD, St (Set a))]
-allReach sti simbs sts r = map (\(s, SimbND x, s') -> (s, SimbD x, s')) $ allReach'' simbs sts r f f -- usando la f descripta abajo hago uso de una funcion cuyo objetivo sera devolver la relacion en su totalidad tomando la relacion construida hasta ahora. Luego mapeo esa lista a la forma de funcion de transicion
-                           where f = map (\s -> (sti, s, St $ allReach' (runSt sti) s sts r)) simbs -- mapeo sombre todos los simbolos una funcion para generar una transicion del estado inical pasado como arg hacia un conjunto de estados por cada simbolo (el conjunto de estados obtenido serían todos los estados del no determinista a los cuales llego con ese simbolo desde cada uno de los estados de mi conjunto de estados inicial en el no determinista, i.e me fijo en el no determinista tomando cada simbolo a que estados voy desde los estados que esten en el nuevo estado inicial del determinista)
+allReach sti simbs sts r = map (\(s, x, s') -> (s, x, s')) $ allReach'' simbs sts r f f
+                           where f = map (\s -> (sti, s, allReach' sti s sts r)) simbs
 
 -- funcion que dado un automata no determinista construye un
 -- automata determinista equivalente. Usamos Set siguiendo
@@ -359,26 +351,26 @@ allReach sti simbs sts r = map (\(s, SimbND x, s') -> (s, SimbD x, s')) $ allRea
 -- -El estado inicial es el estado inicial original + los estados que pueden ser alcanzados a partir de 
 -- este estado original en el no determinista a traves de lambda transitions
 aefndToAEFD :: (Ord a) => AEFND a -> AEFD (Set a)
-aefndToAEFD (ND simb sts (RelT r) stsa sti b) =
-  let simb' = map (\(SimbND x) -> SimbD x) (simb \\ [SimbND ""]) -- mi alfabato es el mismo menos la vacia, el lambda, el ""
-      sti' = St $ fromList $ union [runSt sti] [runSt s | s <- lambdaReach sti sts r] -- el estado inicial nuevo es el estado inicial + los estados a los cuales puedo llegar desde el inicial a traves de lambda/empty transitions
-      f = allReach sti' (simb \\ [SimbND ""]) sts r -- obtengo la funcion de transicion 
-      sts' = nub $ map (\(s, _, _) -> s) f ++ map (\(_, _, s') -> s') f -- obtengo los estados a partir de la funcion de transición y elimino repetidos (esto creo que de alguna forma podria hacerlo al mismo tiempo que calculo las funciones pero se me esta rompiendo la cabeza a esta altura)
-      stsa' = [s | s <- sts', intersection (runSt s) (fromList (map runSt stsa)) /= empty] -- la regla de construccion del conjunto que nos dieron en 2do
-  in D simb' sts' (FunT f) stsa' sti' b
+aefndToAEFD (ND simb sts r stsa sti b) =
+  let simb' = (simb \\ [""])
+      sti' = fromList $ union [sti] (lambdaReach sti sts r)
+      f = allReach sti' (simb \\ [""]) sts r
+      sts' = nub $ map (\(s, _, _) -> s) f ++ map (\(_, _, s') -> s') f
+      stsa' = [s | s <- sts', intersection s (fromList stsa) /= empty]
+  in D simb' sts' f stsa' sti' b
 
 -- funcion para pasar de un automata determinista de estados de tipo a
 -- a un automata determinista de estados de tipo Int
 -- esto es asi para tener alguna convencion y poder trabajar
 -- a los automatas como el mismo tipo de dato
 aefdToAEFDG :: (Eq a) => AEFD a -> AEFDG
-aefdToAEFDG (D simb sts (FunT f) stsa sti b) = let indexes = [0..length sts - 1] -- construyo una lista de 0 a ultimo indice necesario para representar mi cantidad de estados como ints
-                                                   stateRename st = St $ fromJust $ elemIndex st sts -- una funcion trivial que simplemente renombra un estado de tipo `a` a tipo Int
-                                                   sts' = map St indexes -- mis nuevos estados son los indices que consegui arriba asi que simplemente los mapeo con el constructor de estados para tener el tipo correcto
-                                                   f' = map (\(st, t, st') -> (stateRename st, t, stateRename st')) f -- mi nueva funcion de transicion es la misma pero con los nombres de los estados cambiados por la funcion descripta anteriormente stateRename
-                                                   stsa' = map stateRename stsa -- al igual que la funcion de transicion, mis estados de aceptacion son los mismos solo que los llamo con Ints usando stateRename
-                                                   sti' = stateRename sti -- igual que lo anterior, mismo estado solo que lo renombro a Int con stateRename
-                                            in D simb sts' (FunT f') stsa' sti' b
+aefdToAEFDG (D simb sts f stsa sti b) = let indexes = [0..length sts - 1]
+                                            stateRename st = fromJust $ elemIndex st sts
+                                            sts' = indexes
+                                            f' = map (\(st, t, st') -> (stateRename st, t, stateRename st')) f
+                                            stsa' = map stateRename stsa
+                                            sti' = stateRename sti
+                                        in D simb sts' f' stsa' sti' b
 
 -- funcion que toma dos automatas no deterministas
 -- y devuelve otro donde sus estados son de tipo Int (ya que necesitamos normalizarlos a un mismo tipo y evitar repetirlos)
@@ -390,26 +382,24 @@ aefdToAEFDG (D simb sts (FunT f) stsa sti b) = let indexes = [0..length sts - 1]
 -- y su estado inicial sera el estado inicial del primero
 -- todo esto obviamente renombrando los estados a tipo Int con un indice correspondiente para cada uno
 concatAEFND :: (Eq a, Eq b) => AEFND a -> AEFND b -> AEFND Int
-concatAEFND (ND simb sts (RelT r) stsa sti b) (ND simb' sts' (RelT r') stsa' sti' b') =
+concatAEFND (ND simb sts r stsa sti b) (ND simb' sts' r' stsa' sti' b') =
   let l = length sts
       l' = length sts'
-      indexes = [0..(l + l') - 1] -- construyo una lista de 0 a ultimo indice necesario para representar mi cantidad de estados del primer automata + del segundo automata como ints
-      stateRenameP st = St $ fromJust $ elemIndex st sts -- una funcion trivial que simplemente renombra un estado de tipo `a` a tipo Int para el primer automata
-      stateRenameS st = St $ l + fromJust (elemIndex st sts') -- una funcion trivial que simplemente renombra un estado de tipo `a` a tipo Int para el segundo automata buscando su indice en la lista de estados original y luego sumandole un desplazamiento de la cantidad de estados del primer automata
-      sts'' = map St indexes -- mis nuevos estados son los indices que consegui arriba asi que simplemente los mapeo con el constructor de estados para tener el tipo correcto
-      stiS = stateRenameS sti' -- el estado inicial del segundo automata renombrado
-      r'' = map (\(st, t, st') -> (stateRenameP st, t, stateRenameP st')) r -- la relacion del primer automata llevada a los renombres correspondientes de los estados
-         ++ map (\(st, t, st') -> (stateRenameS st, t, stateRenameS st')) r' -- la relacion del segundo automata llevada a los renombres correspondientes de los estados
-         ++ [(stateRenameP st, SimbND "", stiS) | st <- stsa] -- las lambda transitions desde los estados de aceptacion del primer automata al estado inicial del segundo
-      stsa'' = map stateRenameS stsa' -- mis nuevos estados de aceptacion son los estados de aceptacion del segundo automata mapeados con sus nuevos nombres
-      sti'' = stateRenameP sti -- mi nuevo estado inicial es el estado inicial del primer automata renombrado
-  in ND (simb `union` simb') sts'' (RelT r'') stsa'' sti'' (b && b')
+      indexes = [0..(l + l') - 1]
+      stateRenameP st = fromJust $ elemIndex st sts
+      stateRenameS st = l + fromJust (elemIndex st sts')
+      sts'' = indexes
+      stiS = stateRenameS sti'
+      r'' = map (\(st, t, st') -> (stateRenameP st, t, stateRenameP st')) r
+         ++ map (\(st, t, st') -> (stateRenameS st, t, stateRenameS st')) r'
+         ++ [(stateRenameP st, "", stiS) | st <- stsa]
+      stsa'' = map stateRenameS stsa'
+      sti'' = stateRenameP sti
+  in ND (simb `union` simb') sts'' r'' stsa'' sti'' (b && b')
 
 -- 
 aefdToAEFND :: AEFD a -> AEFND a
-aefdToAEFND (D simb sts (FunT f) stsa sti b) = let simb' = map (\(SimbD x) -> SimbND x) simb
-                                                   r = map (\(st, SimbD x, st') -> (st, SimbND x, st')) f
-                                               in ND simb' sts (RelT r) stsa sti b
+aefdToAEFND (D simb sts f stsa sti b) = ND simb sts f stsa sti b
 
 -- funcion que dado un automata determinista
 -- devuelve otro que no tiene estados 'muertos' o 'basura' (ni las transiciones relacionadas a ellos)
@@ -420,10 +410,10 @@ aefdToAEFND (D simb sts (FunT f) stsa sti b) = let simb' = map (\(SimbD x) -> Si
 -- no aportan ninguna informacion util ya que solo haria que se pueda infinitamente poner simbolos
 -- que nunca llegarian a ningun lado (a ninguna regla de produccion que pueda terminar de producir) 
 removeDeadStates :: Eq a => AEFD a -> AEFD a
-removeDeadStates (D simb sts (FunT f) stsa sti b) = let sts' = nub $ filter canContinue sts ++ stsa
-                                                        canContinue s = not $ null (nub ([s' | (ss, _, s') <- f, s == ss]) \\ [s])
-                                                        f' = filter (\(s, _, s') -> s `elem` sts' && s' `elem` sts') f
-                                                    in D simb sts' (FunT f') stsa sti b
+removeDeadStates (D simb sts f stsa sti b) = let sts' = nub $ filter canContinue sts ++ stsa
+                                                 canContinue s = not $ null (nub ([s' | (ss, _, s') <- f, s == ss]) \\ [s])
+                                                 f' = filter (\(s, _, s') -> s `elem` sts' && s' `elem` sts') f
+                                             in D simb sts' f' stsa sti b
 
 -- funcion que dado un automata nos devuelve
 -- true si acepta el lenguaje vacio (o sea que se queda "encerrado" y nunca llega a un estado de aceptacion)

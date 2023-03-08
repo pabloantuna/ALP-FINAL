@@ -5,9 +5,6 @@ module PPrint (
 where
 
 import           Common
-import           Grammar
--- import           Text.PrettyPrint.HughesPJ
--- import           Prelude                 hiding ( (<>) )
 
 import Data.Text ( unpack )
 import Prettyprinter.Render.Terminal
@@ -37,10 +34,10 @@ terminalColor = annotate (color Green)
 
 nt2doc :: NT -> Doc AnsiStyle
 nt2doc Initial = nonTerminalColor (pretty "&")
-nt2doc (NT nt) = nonTerminalColor (pretty (tail $ init nt)) -- fix horrendo para sacar las comillas
+nt2doc (NT nt) = nonTerminalColor (pretty (tail $ init nt))
 
 t2doc :: T -> Doc AnsiStyle
-t2doc t = dquotes $ terminalColor (pretty $ runT t)
+t2doc t = dquotes $ terminalColor (pretty t)
 
 printTs :: [T] -> Doc AnsiStyle
 printTs [] = pretty ""
@@ -48,7 +45,7 @@ printTs [t] = t2doc t
 printTs (t:ts) = t2doc t <> comma <> printTs ts
 
 printSimb :: [T] -> Doc AnsiStyle
-printSimb ts = pretty "Alfabeto: {" <> printTs (sort ts \\ [T ""]) <> pretty "}\n" -- le saco el lambda
+printSimb ts = pretty "Alfabeto: {" <> printTs (sort ts \\ [""]) <> pretty "}\n" -- le saco el lambda
 
 printRightSideLeft :: RigthSide -> Doc AnsiStyle
 printRightSideLeft (RT t) = t2doc t
